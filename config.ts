@@ -1,28 +1,53 @@
-// NEAR Network Configuration
+// Type definitions
+interface ContractPerNetwork {
+  mainnet: string;
+  testnet: string;
+}
 
-export type NetworkId = 'mainnet' | 'testnet';
+interface EVMWalletChain {
+  chainId: number;
+  name: string;
+  explorer: string;
+  rpc: string;
+}
 
-// Selected network - change this to 'mainnet' for production
-export const NETWORK_ID: NetworkId = 'testnet';
+// Contract addresses per network
+const contractPerNetwork: ContractPerNetwork = {
+  mainnet: 'hello.near-examples.near',
+  testnet: 'hello.near-examples.testnet',
+};
 
-// Contract configuration
-export const CONTRACTS = {
+// Chains for EVM Wallets
+const evmWalletChains: Record<'mainnet' | 'testnet', EVMWalletChain> = {
   mainnet: {
-    // Add your mainnet contract addresses here
+    chainId: 397,
+    name: 'Near Mainnet',
+    explorer: 'https://eth-explorer.near.org',
+    rpc: 'https://eth-rpc.mainnet.near.org',
   },
   testnet: {
-    // Add your testnet contract addresses here
+    chainId: 398,
+    name: 'Near Testnet',
+    explorer: 'https://eth-explorer-testnet.near.org',
+    rpc: 'https://eth-rpc.testnet.near.org',
   },
 };
 
-// RPC endpoints
-export const RPC_ENDPOINTS = {
-  mainnet: 'https://rpc.mainnet.near.org',
-  testnet: 'https://rpc.testnet.near.org',
-};
+// Selected network - CHANGE THIS TO SWITCH NETWORKS
+export const NetworkId: 'mainnet' | 'testnet' = 'testnet';
 
-// Explorer URLs
-export const EXPLORER_URLS = {
-  mainnet: 'https://nearblocks.io',
-  testnet: 'https://testnet.nearblocks.io',
+// Contract & EVM chain for the selected network
+export const HelloNearContract: string = contractPerNetwork[NetworkId];
+export const EVMWalletChain: EVMWalletChain = evmWalletChains[NetworkId];
+
+// NEAR Connect configuration for near-connect-hooks
+export const NearConnectConfig = {
+  network: NetworkId,
+  providers: { 
+    [NetworkId]: [
+      NetworkId === 'testnet' 
+        ? 'https://rpc.testnet.near.org'
+        : 'https://rpc.mainnet.near.org'
+    ]
+  },
 };

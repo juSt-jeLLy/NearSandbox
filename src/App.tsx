@@ -16,7 +16,14 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <NearProvider>
+    <NearProvider 
+      config={{
+        network: "testnet",
+        providers: {
+          testnet: ["https://rpc.testnet.near.org"]
+        }
+      }}
+    >
       <TooltipProvider>
         <Toaster />
         <Sonner />
