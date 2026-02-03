@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Menu, X, Shield, Upload, Store, User } from 'lucide-react';
+import { Menu, X, Shield, Upload, Store, User, Wallet, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useNearWallet } from 'near-connect-hooks';
 
 const navItems = [
   { path: '/', label: 'Home', icon: Shield },
@@ -14,6 +15,21 @@ const navItems = [
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const { signedAccountId, loading, signIn, signOut } = useNearWallet();
+
+  const handleWalletAction = () => {
+    if (signedAccountId) {
+      signOut();
+    } else {
+      signIn();
+    }
+  };
+
+  // Truncate account ID for display
+  const truncateAccountId = (accountId: string) => {
+    if (accountId.length <= 20) return accountId;
+    return `${accountId.slice(0, 8)}...${accountId.slice(-8)}`;
+  };
 
   return (
     <motion.nav
@@ -72,6 +88,38 @@ const Navbar = () => {
                 </Link>
               );
             })}
+
+            {/* Wallet Connection Button */}
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="ml-2"
+            >
+              <Button
+                onClick={handleWalletAction}
+                disabled={loading}
+                variant={signedAccountId ? 'outline' : 'default'}
+                className={`gap-2 ${signedAccountId ? 'glow' : ''}`}
+              >
+                {loading ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Loading...
+                  </>
+                ) : signedAccountId ? (
+                  <>
+                    <Wallet className="h-4 w-4" />
+                    {truncateAccountId(signedAccountId)}
+                    <LogOut className="h-3 w-3 ml-1" />
+                  </>
+                ) : (
+                  <>
+                    <Wallet className="h-4 w-4" />
+                    LOGIN
+                  </>
+                )}
+              </Button>
+            </motion.div>
           </div>
 
           {/* Mobile Menu Button */}
@@ -118,6 +166,40 @@ const Navbar = () => {
               </Link>
             );
           })}
+
+          {/* Mobile Wallet Button */}
+          <motion.div
+            whileTap={{ scale: 0.98 }}
+            className="pt-2"
+          >
+            <Button
+              onClick={() => {
+                handleWalletAction();
+                setIsOpen(false);
+              }}
+              disabled={loading}
+              variant={signedAccountId ? 'outline' : 'default'}
+              className="w-full gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Loading...
+                </>
+              ) : signedAccountId ? (
+                <>
+                  <Wallet className="h-5 w-5" />
+                  {truncateAccountId(signedAccountId)}
+                  <LogOut className="h-4 w-4 ml-auto" />
+                </>
+              ) : (
+                <>
+                  <Wallet className="h-5 w-5" />
+                  LOGIN
+                </>
+              )}
+            </Button>
+          </motion.div>
         </div>
       </motion.div>
     </motion.nav>

@@ -51,6 +51,7 @@
     "framer-motion": "^12.30.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.462.0",
+    "near-connect-hooks": "^1.0.3",
     "next-themes": "^0.3.0",
     "nova-sdk-js": "^1.0.3",
     "react": "^18.3.1",
