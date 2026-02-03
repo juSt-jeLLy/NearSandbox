@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 120 20% 95%;
+    
+    --card: 0 0% 7%;
+    --card-foreground: 120 20% 95%;
+    
+    --popover: 0 0% 7%;
+    --popover-foreground: 120 20% 95%;
+    
+    --primary: 142 70% 45%;
+    --primary-foreground: 0 0% 2%;
+    
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 120 20% 95%;
+    
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+    
+    --accent: 142 70% 45%;
+    --accent-foreground: 0 0% 2%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 142 70% 45%;
+    
+    --radius: 0.75rem;
+    
+    --glow: 142 70% 45%;
+    
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 120 20% 95%;
+    --sidebar-primary: 142 70% 45%;
+    --sidebar-primary-foreground: 0 0% 2%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 120 20% 95%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 142 70% 45%;
+  }
+
+  .dark {
+    --background: 0 0% 4%;
+    --foreground: 120 20% 95%;
+    
+    --card: 0 0% 7%;
+    --card-foreground: 120 20% 95%;
+    
+    --popover: 0 0% 7%;
+    --popover-foreground: 120 20% 95%;
+    
+    --primary: 142 70% 45%;
+    --primary-foreground: 0 0% 2%;
+    
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 120 20% 95%;
+    
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+    
+    --accent: 142 70% 45%;
+    --accent-foreground: 0 0% 2%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 142 70% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .glow {
+    box-shadow: 0 0 20px hsl(var(--glow) / 0.3), 0 0 40px hsl(var(--glow) / 0.1);
+  }
+  
+  .glow-text {
+    text-shadow: 0 0 10px hsl(var(--glow) / 0.5), 0 0 20px hsl(var(--glow) / 0.3);
+  }
+  
+  .gradient-border {
+    border: 1px solid transparent;
+    background: linear-gradient(hsl(var(--background)), hsl(var(--background))) padding-box,
+                linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.3)) border-box;
+  }
+}
