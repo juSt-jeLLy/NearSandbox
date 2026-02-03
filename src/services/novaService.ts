@@ -1,4 +1,10 @@
 import { NovaSdk } from 'nova-sdk-js';
+import { Buffer } from 'buffer';
+
+// Polyfill Buffer for browser environment
+if (typeof window !== 'undefined' && typeof window.Buffer === 'undefined') {
+  (window as any).Buffer = Buffer;
+}
 
 // Environment variables - user will set these
 const NOVA_ACCOUNT_ID = import.meta.env.VITE_NOVA_ACCOUNT_ID || '';
