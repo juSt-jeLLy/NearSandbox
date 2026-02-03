@@ -15,7 +15,7 @@ export const getNovaSDK = (): NovaSdk => {
     sdkInstance = new NovaSdk(NOVA_ACCOUNT_ID, {
       apiKey: NOVA_API_KEY,
       rpcUrl: 'https://rpc.testnet.near.org',
-      contractId: 'nova-sdk-5.testnet',
+      contractId: 'nova-sdk-6.testnet',
     });
   }
   
