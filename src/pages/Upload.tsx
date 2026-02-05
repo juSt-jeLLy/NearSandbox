@@ -1,21 +1,28 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload as UploadIcon, File, CheckCircle, AlertCircle, Loader2, Copy, ExternalLink } from 'lucide-react';
+import { Upload as UploadIcon, File, CheckCircle, AlertCircle, Loader2, Copy, ExternalLink, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import PageTransition from '@/components/PageTransition';
 import GlowCard from '@/components/GlowCard';
-import { uploadFile, registerGroup, isNovaConfigured, UploadResult } from '@/services/novaService';
+import { isNovaConfigured } from '@/services/novaService';
+import { uploadAndCreateListing, CombinedUploadResult, CombinedUploadProgress } from '@/services/combinedUploadService';
 import { toast } from 'sonner';
+import { useNearWallet } from 'near-connect-hooks';
 import CreateListing from '@/components/CreateListing';
 
 const Upload = () => {
+  const { callFunction, signedAccountId } = useNearWallet();
+  
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [groupId, setGroupId] = useState('');
+  const [assetType, setAssetType] = useState<'Image' | 'Dataset' | 'Audio' | 'Other'>('Image');
+  const [price, setPrice] = useState('');
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<CombinedUploadProgress | null>(null);
+  const [uploadResult, setUploadResult] = useState<CombinedUploadResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -49,8 +56,13 @@ const Upload = () => {
   }, []);
 
   const handleUpload = async () => {
-    if (!file || !groupId.trim()) {
-      toast.error('Please select a file and enter a group ID');
+    if (!file || !price.trim()) {
+      toast.error('Please select a file and enter a price');
+      return;
+    }
+
+    if (!signedAccountId) {
+      toast.error('Please connect your NEAR wallet first');
       return;
     }
 
@@ -61,31 +73,45 @@ const Upload = () => {
 
     setIsUploading(true);
     setError(null);
+    setUploadProgress(null);
+    setUploadResult(null);
 
     try {
-      // Try to create group first (might already exist)
-      try {
-        await registerGroup(groupId.trim());
-        toast.success('Group created successfully');
-      } catch (e: any) {
-        if (!e.message?.includes('exists') && !e.message?.includes('already')) {
-          console.log('Group may already exist, continuing...');
+      const result = await uploadAndCreateListing(
+        file,
+        assetType,
+        parseInt(price),
+        signedAccountId,
+        callFunction,
+        (progress) => {
+          setUploadProgress(progress);
+          
+          // Show toast for each step
+          switch (progress.step) {
+            case 'registering_group':
+              toast.info('Creating NOVA group...');
+              break;
+            case 'uploading_to_nova':
+              toast.info('Uploading to IPFS...');
+              break;
+            case 'creating_listing':
+              toast.info('Creating marketplace listing...');
+              break;
+            case 'complete':
+              toast.success('Upload complete!');
+              break;
+          }
         }
-      }
-
-      // Read file as buffer
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = new Uint8Array(arrayBuffer);
-
-      // Upload to NOVA
-      const result = await uploadFile(groupId.trim(), buffer, file.name);
+      );
+      
       setUploadResult(result);
-      toast.success('File uploaded successfully!');
+      toast.success('File uploaded and listed successfully!');
     } catch (e: any) {
       setError(e.message || 'Upload failed');
       toast.error('Upload failed: ' + e.message);
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -121,18 +147,42 @@ const Upload = () => {
 
           <GlowCard glowOnHover={false} className="mb-6">
             <div className="space-y-6">
-              {/* Group ID Input */}
+              {/* Asset Type Selection */}
               <div className="space-y-2">
-                <Label htmlFor="groupId">Group ID</Label>
+                <Label htmlFor="assetType">Asset Type</Label>
+                <Select
+                  value={assetType}
+                  onValueChange={(value: any) => setAssetType(value)}
+                  disabled={isUploading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select asset type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Image">Image</SelectItem>
+                    <SelectItem value="Dataset">Dataset</SelectItem>
+                    <SelectItem value="Audio">Audio</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Type of digital asset you're uploading
+                </p>
+              </div>
+
+              {/* Price Input */}
+              <div className="space-y-2">
+                <Label htmlFor="price">Price (in NEAR)</Label>
                 <Input
-                  id="groupId"
-                  placeholder="Enter group ID (e.g., my-digital-art)"
-                  value={groupId}
-                  onChange={(e) => setGroupId(e.target.value)}
+                  id="price"
+                  type="number"
+                  placeholder="Enter price (e.g., 5)"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
                   disabled={isUploading}
                 />
                 <p className="text-xs text-muted-foreground">
-                  A group controls access to your files. Create a new one or use an existing group.
+                  Price for your encrypted file on the marketplace
                 </p>
               </div>
 
@@ -213,22 +263,28 @@ const Upload = () => {
               {/* Upload Button */}
               <Button
                 onClick={handleUpload}
-                disabled={!file || !groupId.trim() || isUploading}
+                disabled={!file || !price.trim() || isUploading || !signedAccountId}
                 className="w-full glow"
                 size="lg"
               >
                 {isUploading ? (
                   <>
                     <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    Encrypting & Uploading...
+                    {uploadProgress?.message || 'Processing...'}
                   </>
                 ) : (
                   <>
-                    <UploadIcon className="h-5 w-5 mr-2" />
-                    Upload to NOVA
+                    <Package className="h-5 w-5 mr-2" />
+                    Upload & List on Marketplace
                   </>
                 )}
               </Button>
+
+              {!signedAccountId && (
+                <p className="text-sm text-center text-muted-foreground">
+                  Please connect your NEAR wallet to upload and list files
+                </p>
+              )}
             </div>
           </GlowCard>
 
@@ -248,12 +304,43 @@ const Upload = () => {
                     <div>
                       <h3 className="font-semibold">Upload Successful!</h3>
                       <p className="text-sm text-muted-foreground">
-                        Your file has been encrypted and stored
+                        Your file has been encrypted, uploaded, and listed on the marketplace
                       </p>
                     </div>
                   </div>
 
                   <div className="space-y-4">
+                    {/* Product ID */}
+                    <div className="p-3 rounded-lg bg-secondary">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-muted-foreground">Product ID</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(uploadResult.productId.toString(), 'Product ID')}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="font-mono text-sm break-all">{uploadResult.productId}</p>
+                    </div>
+
+                    {/* NOVA Group ID */}
+                    <div className="p-3 rounded-lg bg-secondary">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-muted-foreground">NOVA Group ID</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(uploadResult.groupId, 'Group ID')}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="font-mono text-sm break-all">{uploadResult.groupId}</p>
+                    </div>
+
+                    {/* IPFS CID */}
                     <div className="p-3 rounded-lg bg-secondary">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm text-muted-foreground">IPFS CID</span>
@@ -268,9 +355,10 @@ const Upload = () => {
                       <p className="font-mono text-sm break-all">{uploadResult.cid}</p>
                     </div>
 
+                    {/* NOVA Transaction ID */}
                     <div className="p-3 rounded-lg bg-secondary">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-muted-foreground">Transaction ID</span>
+                        <span className="text-sm text-muted-foreground">NOVA Transaction</span>
                         <div className="flex gap-1">
                           <Button
                             variant="ghost"
@@ -305,21 +393,38 @@ const Upload = () => {
                         </p>
                       </div>
                     </div>
+
+                    {/* Link to Marketplace */}
+                    <div className="pt-4 border-t border-border">
+                      <Button
+                        className="w-full"
+                        onClick={() => window.location.href = '/marketplace'}
+                      >
+                        View in Marketplace
+                      </Button>
+                    </div>
                   </div>
                 </GlowCard>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Create Listing Component */}
+          {/* Manual Create Listing Section (For Testing) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
+            className="mt-8 pt-8 border-t border-border"
           >
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold mb-2">Manual Listing Creation</h2>
+              <p className="text-sm text-muted-foreground">
+                Or create a marketplace listing manually with custom parameters
+              </p>
+            </div>
             <CreateListing 
               uploadedCid={uploadResult?.cid}
-              uploadedGroupId={groupId}
+              uploadedGroupId={uploadResult?.groupId}
             />
           </motion.div>
         </div>
