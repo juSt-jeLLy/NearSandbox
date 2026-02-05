@@ -8,6 +8,7 @@ import PageTransition from '@/components/PageTransition';
 import GlowCard from '@/components/GlowCard';
 import { uploadFile, registerGroup, isNovaConfigured, UploadResult } from '@/services/novaService';
 import { toast } from 'sonner';
+import CreateListing from '@/components/CreateListing';
 
 const Upload = () => {
   const [isDragging, setIsDragging] = useState(false);
@@ -239,7 +240,7 @@ const Upload = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
               >
-                <GlowCard>
+                <GlowCard className="mb-6">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="p-2 rounded-full bg-primary/10">
                       <CheckCircle className="h-6 w-6 text-primary" />
@@ -309,6 +310,18 @@ const Upload = () => {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Create Listing Component */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <CreateListing 
+              uploadedCid={uploadResult?.cid}
+              uploadedGroupId={groupId}
+            />
+          </motion.div>
         </div>
       </div>
     </PageTransition>
