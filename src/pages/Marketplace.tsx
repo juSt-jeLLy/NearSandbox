@@ -36,7 +36,7 @@ const Marketplace = () => {
   const [buyingListingId, setBuyingListingId] = useState<number | null>(null);
 
   // Fetch listings from NEAR contract
-  const { listings, loading, error } = useMarketplaceListings();
+  const { listings, loading, error, buyListing } = useMarketplaceListings();
 
   const onBuyClick = async (listing: any) => {
     console.log('Buy clicked for listing:', listing);
@@ -65,7 +65,7 @@ const Marketplace = () => {
       
       const quote = await OneClickService.getQuote(quoteRequest);
       console.log('Quote received:', quote);
-      
+      await buyListing(listing.product_id);
     } catch (err: any) {
       console.error('Failed to get quote:', err);
       
@@ -183,7 +183,7 @@ const Marketplace = () => {
                 <motion.div key={listing.product_id} variants={itemVariants}>
                   <ProductCard
                     listing={listing}
-                    onBuy={onBuyClick}
+                    onBuy={() => onBuyClick(listing)}
                     isBuying={buyingListingId === listing.product_id}
                   />
                 </motion.div>

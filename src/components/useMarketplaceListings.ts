@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNearWallet } from 'near-connect-hooks';
 
-const MARKETPLACE_CONTRACT = '177a0e-718040-1770099193.nearplay.testnet';
+const MARKETPLACE_CONTRACT = 'warmowl5525.testnet';
+
+const THIRTY_TGAS = '30000000000000';
+const NO_DEPOSIT = '0';
 
 export interface Listing {
   product_id: number;
@@ -15,7 +18,7 @@ export interface Listing {
 }
 
 export const useMarketplaceListings = () => {
-  const { viewFunction } = useNearWallet();
+  const { viewFunction, signAndSendTransaction } = useNearWallet();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,5 +47,23 @@ export const useMarketplaceListings = () => {
     fetchListings();
   }, [viewFunction]);
 
-  return { listings, loading, error };
+  const buyListing = async (product_id: number) => {
+    const res = await signAndSendTransaction({
+      receiverId: MARKETPLACE_CONTRACT,
+      actions: [
+        {
+          type: 'FunctionCall',
+          params: {
+            methodName: 'buy',
+            args: { p_id: product_id },
+            gas: THIRTY_TGAS,
+            deposit: NO_DEPOSIT
+          }
+        }
+      ]
+    });
+    return res;
+  };
+
+  return { listings, loading, error, buyListing };
 };
