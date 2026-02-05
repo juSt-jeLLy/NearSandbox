@@ -5,7 +5,37 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import PageTransition from '@/components/PageTransition';
 import GlowCard from '@/components/GlowCard';
+import {OpenAPI, QuoteRequest,OneClickService} from '@defuse-protocol/one-click-sdk-typescript'
 
+OpenAPI.BASE = 'https://1click.chaindefuser.com';
+OpenAPI.TOKEN=process.env.TOKEN;
+const onBuyClick = async () => {
+const quoteRequest: QuoteRequest = {
+    dry: true,
+    swapType: QuoteRequest.swapType.EXACT_INPUT,
+    slippageTolerance: 100, // 1%
+    originAsset: 'nep141:arb-0xaf88d065e77c8cc2239327c5edb3a432268e5831.omft.near', // USDC on Arbitrum
+    depositType: QuoteRequest.depositType.ORIGIN_CHAIN,
+    destinationAsset: 'nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near', // USDC on Solana
+    amount: '1000000', // 1 USDC (in smallest units)
+    refundTo: '0x2527D02599Ba641c19FEa793cD0F167589a0f10D', // Valid Arbitrum address
+    refundType: QuoteRequest.refundType.ORIGIN_CHAIN, 
+    recipient: '13QkxhNMrTPxoCkRdYdJ65tFuwXPhL5gLS2Z5Nr6gjRK', // Valid Solana Address
+    recipientType: QuoteRequest.recipientType.DESTINATION_CHAIN,
+    deadline: "2026-02-06T14:15:22Z"
+    
+};
+try {
+  const quote = await OneClickService.getQuote(quoteRequest);
+  console.log('Quote:', quote);
+} catch (err) {
+  console.error('Failed to get quote:', err);
+}
+}
+
+const getStatus= async(depositAddress: string)=>{
+  const status = await OneClickService.getExecutionStatus(depositAddress);
+}
 // Mock marketplace items (in real app, would come from NOVA transactions)
 const mockItems = [
   {
@@ -132,7 +162,7 @@ const Marketplace = () => {
               <span className="text-primary">NOVA</span> Marketplace
             </h1>
             <p className="text-muted-foreground">
-              Browse and access encrypted digital assets securely
+              Browse and Buy encrypted digital assets securely
             </p>
           </motion.div>
 
@@ -231,9 +261,9 @@ const Marketplace = () => {
                           <Eye className="h-4 w-4" />
                           Preview
                         </Button>
-                        <Button size="sm" className="flex-1 gap-2">
+                        <Button size="sm" className="flex-1 gap-2" onClick={onBuyClick}>
                           <Download className="h-4 w-4" />
-                          Access
+                          Buy
                         </Button>
                       </div>
                     </div>
@@ -279,9 +309,9 @@ const Marketplace = () => {
                           <Eye className="h-4 w-4" />
                           Preview
                         </Button>
-                        <Button size="sm" className="gap-2">
+                        <Button size="sm" className="gap-2" onClick={onBuyClick}>
                           <Download className="h-4 w-4" />
-                          Access
+                          Buy
                         </Button>
                       </div>
                     </div>
