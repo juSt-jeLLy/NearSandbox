@@ -1,7 +1,7 @@
 import { uploadFile, registerGroup } from './novaService';
 import { Buffer } from 'buffer';
 
-const MARKETPLACE_CONTRACT = '177a0e-718040-1770099193.nearplay.testnet';
+const MARKETPLACE_CONTRACT = 'marketplace-1770490780.testnet';
 
 export interface CombinedUploadResult {
   // NOVA upload results
