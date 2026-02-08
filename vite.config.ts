@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import react from "@vitejs/plugin-react-swc";
 import path from 'path';
 
 // https://vitejs.dev/config/
@@ -8,19 +8,27 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      // Polyfill Buffer for browser
       buffer: 'buffer',
     },
   },
   define: {
-    // Required for buffer to work in browser
+    'process.env': {},
     global: 'globalThis',
   },
   optimizeDeps: {
+    include: ['buffer'],
     esbuildOptions: {
-      // Node.js global to browser globalThis
       define: {
         global: 'globalThis',
+      },
+    },
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://nova-sdk.com',
+        changeOrigin: true,
+        secure: false,
       },
     },
   },

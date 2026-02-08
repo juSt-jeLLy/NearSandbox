@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Wallet, Shield, Activity, Copy, ExternalLink, RefreshCw, AlertCircle, Package, ShoppingCart, TrendingUp, Clock, CheckCircle, XCircle, Download, Loader2, UserPlus, TestTube } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import PageTransition from '@/components/PageTransition';
 import GlowCard from '@/components/GlowCard';
 import { isNovaConfigured, getBalance, authStatus, getNetworkInfo, getTransactionsForGroup } from '@/services/novaService';
