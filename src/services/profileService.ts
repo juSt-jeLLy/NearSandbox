@@ -1,6 +1,6 @@
-import { useNearWallet } from 'near-connect-hooks';
+import { getPendingAccessBuyers, getBuyersWithAccess, checkBuyerAccess } from './buyerAccessService';
 
-const MARKETPLACE_CONTRACT = 'marketplace-1770490780.testnet';
+const MARKETPLACE_CONTRACT = 'marketplace-1770558741.testnet';
 
 export interface UserStats {
   listingsCreated: number;
@@ -29,6 +29,17 @@ export interface PurchasedItem {
   cid: string;
 }
 
+// Extended types with access info
+export interface ListingWithAccessInfo extends UserListing {
+  pendingBuyers: number;
+  activeBuyers: number;
+}
+
+export interface PurchasedItemWithAccessInfo extends PurchasedItem {
+  hasAccess: boolean;
+  accessStatus: 'pending' | 'granted' | 'unknown';
+}
+
 /**
  * Fetch all listings created by the current user
  */
@@ -48,6 +59,48 @@ export const getUserCreatedListings = async (
     );
   } catch (error) {
     console.error('Failed to fetch user created listings:', error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch all listings created by user WITH access status info
+ */
+export const getUserCreatedListingsWithAccess = async (
+  viewFunction: any,
+  userAccountId: string
+): Promise<ListingWithAccessInfo[]> => {
+  try {
+    const listings = await getUserCreatedListings(viewFunction, userAccountId);
+    
+    // Fetch access info for each listing
+    const listingsWithAccess = await Promise.all(
+      listings.map(async (listing) => {
+        try {
+          const [pending, active] = await Promise.all([
+            getPendingAccessBuyers(listing.product_id, viewFunction),
+            getBuyersWithAccess(listing.product_id, viewFunction),
+          ]);
+          
+          return {
+            ...listing,
+            pendingBuyers: pending.length,
+            activeBuyers: active.length,
+          } as ListingWithAccessInfo;
+        } catch (e) {
+          console.error(`Failed to fetch access info for listing ${listing.product_id}:`, e);
+          return {
+            ...listing,
+            pendingBuyers: 0,
+            activeBuyers: 0,
+          } as ListingWithAccessInfo;
+        }
+      })
+    );
+    
+    return listingsWithAccess;
+  } catch (error) {
+    console.error('Failed to fetch user created listings with access:', error);
     throw error;
   }
 };
@@ -83,6 +136,49 @@ export const getUserPurchasedItems = async (
 };
 
 /**
+ * Fetch all items purchased by user WITH access status info
+ */
+export const getUserPurchasedItemsWithAccess = async (
+  viewFunction: any,
+  userAccountId: string
+): Promise<PurchasedItemWithAccessInfo[]> => {
+  try {
+    const purchased = await getUserPurchasedItems(viewFunction, userAccountId);
+    
+    // Check access status for each purchased item
+    const purchasedWithAccess = await Promise.all(
+      purchased.map(async (item) => {
+        try {
+          const hasAccess = await checkBuyerAccess(
+            item.product_id,
+            userAccountId,
+            viewFunction
+          );
+          
+          return {
+            ...item,
+            hasAccess,
+            accessStatus: hasAccess ? 'granted' : 'pending',
+          } as PurchasedItemWithAccessInfo;
+        } catch (e) {
+          console.error(`Failed to check access for item ${item.product_id}:`, e);
+          return {
+            ...item,
+            hasAccess: false,
+            accessStatus: 'unknown',
+          } as PurchasedItemWithAccessInfo;
+        }
+      })
+    );
+    
+    return purchasedWithAccess;
+  } catch (error) {
+    console.error('Failed to fetch user purchased items with access:', error);
+    throw error;
+  }
+};
+
+/**
  * Calculate user statistics
  */
 export const getUserStats = async (
@@ -104,6 +200,32 @@ export const getUserStats = async (
     };
   } catch (error) {
     console.error('Failed to fetch user stats:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get comprehensive user profile data with access info
+ * One-stop function to fetch everything needed for profile page
+ */
+export const getUserProfileData = async (
+  viewFunction: any,
+  userAccountId: string
+) => {
+  try {
+    const [stats, createdListings, purchasedItems] = await Promise.all([
+      getUserStats(viewFunction, userAccountId),
+      getUserCreatedListingsWithAccess(viewFunction, userAccountId),
+      getUserPurchasedItemsWithAccess(viewFunction, userAccountId),
+    ]);
+    
+    return {
+      stats,
+      createdListings,
+      purchasedItems,
+    };
+  } catch (error) {
+    console.error('Failed to fetch user profile data:', error);
     throw error;
   }
 };

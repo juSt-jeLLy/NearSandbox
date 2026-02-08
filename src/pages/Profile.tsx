@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Wallet, Shield, Activity, Copy, ExternalLink, RefreshCw, AlertCircle, Package, ShoppingCart, TrendingUp } from 'lucide-react';
+import { User, Wallet, Shield, Activity, Copy, ExternalLink, RefreshCw, AlertCircle, Package, ShoppingCart, TrendingUp, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import PageTransition from '@/components/PageTransition';
 import GlowCard from '@/components/GlowCard';
 import { isNovaConfigured, getBalance, authStatus, getNetworkInfo, getTransactionsForGroup } from '@/services/novaService';
-import { getUserStats, getUserCreatedListings, getUserPurchasedItems, UserStats, UserListing, PurchasedItem } from '@/services/profileService';
+import { 
+  getUserProfileData,
+  UserStats,
+  ListingWithAccessInfo,
+  PurchasedItemWithAccessInfo 
+} from '@/services/profileService';
 import { useNearWallet } from 'near-connect-hooks';
 import { toast } from 'sonner';
 
@@ -22,10 +27,10 @@ const Profile = () => {
   const [groupIdInput, setGroupIdInput] = useState('');
   const [transactions, setTransactions] = useState<any[]>([]);
   
-  // Marketplace stats
+  // Marketplace stats with access info
   const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [createdListings, setCreatedListings] = useState<UserListing[]>([]);
-  const [purchasedItems, setPurchasedItems] = useState<PurchasedItem[]>([]);
+  const [createdListings, setCreatedListings] = useState<ListingWithAccessInfo[]>([]);
+  const [purchasedItems, setPurchasedItems] = useState<PurchasedItemWithAccessInfo[]>([]);
   const [loadingStats, setLoadingStats] = useState(false);
 
   useEffect(() => {
@@ -71,15 +76,13 @@ const Profile = () => {
     
     setLoadingStats(true);
     try {
-      const [stats, created, purchased] = await Promise.all([
-        getUserStats(viewFunction, signedAccountId),
-        getUserCreatedListings(viewFunction, signedAccountId),
-        getUserPurchasedItems(viewFunction, signedAccountId),
-      ]);
+      // Use the comprehensive profile data function
+      const profileData = await getUserProfileData(viewFunction, signedAccountId);
       
-      setUserStats(stats);
-      setCreatedListings(created);
-      setPurchasedItems(purchased);
+      setUserStats(profileData.stats);
+      setCreatedListings(profileData.createdListings);
+      setPurchasedItems(profileData.purchasedItems);
+      
     } catch (e: any) {
       console.error('Failed to fetch marketplace stats:', e);
       toast.error('Failed to load marketplace data');
@@ -109,6 +112,32 @@ const Profile = () => {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
+  };
+
+  const getAccessBadge = (accessStatus: 'pending' | 'granted' | 'unknown') => {
+    switch (accessStatus) {
+      case 'granted':
+        return (
+          <div className="flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-green-500/20 text-green-500">
+            <CheckCircle className="h-3 w-3" />
+            Access Granted
+          </div>
+        );
+      case 'pending':
+        return (
+          <div className="flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-500">
+            <Clock className="h-3 w-3" />
+            Pending Access
+          </div>
+        );
+      case 'unknown':
+        return (
+          <div className="flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-gray-500/20 text-gray-500">
+            <AlertCircle className="h-3 w-3" />
+            Unknown
+          </div>
+        );
+    }
   };
 
   return (
@@ -148,7 +177,7 @@ const Profile = () => {
                     </p>
                     <div className="space-y-2 font-mono text-sm">
                       <div className="p-2 rounded bg-secondary">
-                        VITE_NOVA_ACCOUNT_ID=yourname.nova-sdk-5.testnet
+                        VITE_NOVA_ACCOUNT_ID=yourname.nova-sdk.near
                       </div>
                       <div className="p-2 rounded bg-secondary">
                         VITE_NOVA_API_KEY=nova_sk_xxxxxxxxxxxxx
@@ -240,7 +269,7 @@ const Profile = () => {
             </motion.div>
           )}
 
-          {/* Created Listings Summary */}
+          {/* Created Listings Summary with Access Info */}
           {signedAccountId && createdListings.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -255,29 +284,51 @@ const Profile = () => {
                   </div>
                   <h2 className="text-lg font-semibold">Your Listings</h2>
                 </div>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-96 overflow-y-auto">
                   {createdListings.map((listing) => (
                     <div
                       key={listing.product_id}
-                      className="p-3 rounded-lg bg-secondary flex items-center justify-between"
+                      className="p-3 rounded-lg bg-secondary"
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium">Product #{listing.product_id}</span>
-                          <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary">
-                            {listing.list_type}
-                          </span>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium">Product #{listing.product_id}</span>
+                            <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary">
+                              {listing.list_type}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground font-mono truncate">
+                            {listing.nova_group_id}
+                          </p>
                         </div>
-                        <p className="text-sm text-muted-foreground font-mono truncate">
-                          {listing.nova_group_id}
-                        </p>
+                        <div className="text-right ml-4">
+                          <p className="font-semibold text-primary">{listing.price} NEAR</p>
+                          <p className="text-xs text-muted-foreground">
+                            {listing.purchase_number} {listing.purchase_number === 1 ? 'sale' : 'sales'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right ml-4">
-                        <p className="font-semibold text-primary">{listing.price} NEAR</p>
-                        <p className="text-xs text-muted-foreground">
-                          {listing.purchase_number} {listing.purchase_number === 1 ? 'sale' : 'sales'}
-                        </p>
-                      </div>
+                      
+                      {/* Buyer Access Status */}
+                      {listing.buyers.length > 0 && (
+                        <div className="pt-2 border-t border-border/50 flex items-center gap-4 text-sm">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="text-muted-foreground">
+                              {listing.activeBuyers} with access
+                            </span>
+                          </div>
+                          {listing.pendingBuyers > 0 && (
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-yellow-500" />
+                              <span className="text-muted-foreground">
+                                {listing.pendingBuyers} pending
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -285,7 +336,7 @@ const Profile = () => {
             </motion.div>
           )}
 
-          {/* Purchased Items Summary */}
+          {/* Purchased Items Summary with Access Status */}
           {signedAccountId && purchasedItems.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -300,25 +351,32 @@ const Profile = () => {
                   </div>
                   <h2 className="text-lg font-semibold">Purchased Items</h2>
                 </div>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-96 overflow-y-auto">
                   {purchasedItems.map((item) => (
                     <div
                       key={item.product_id}
-                      className="p-3 rounded-lg bg-secondary flex items-center justify-between"
+                      className="p-3 rounded-lg bg-secondary"
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium">Product #{item.product_id}</span>
-                          <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary">
-                            {item.list_type}
-                          </span>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium">Product #{item.product_id}</span>
+                            <span className="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary">
+                              {item.list_type}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground font-mono truncate">
+                            {item.nova_group_id}
+                          </p>
                         </div>
-                        <p className="text-sm text-muted-foreground font-mono truncate">
-                          {item.nova_group_id}
-                        </p>
+                        <div className="text-right ml-4">
+                          <p className="font-semibold">{item.price} NEAR</p>
+                        </div>
                       </div>
-                      <div className="text-right ml-4">
-                        <p className="font-semibold">{item.price} NEAR</p>
+                      
+                      {/* Access Status */}
+                      <div className="pt-2 border-t border-border/50 flex items-center justify-between">
+                        {getAccessBadge(item.accessStatus)}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -326,9 +384,21 @@ const Profile = () => {
                           onClick={() => copyToClipboard(item.cid, 'CID')}
                         >
                           <Copy className="h-3 w-3 mr-1" />
-                          CID
+                          Copy CID
                         </Button>
                       </div>
+                      
+                      {/* Access Message */}
+                      {item.accessStatus === 'pending' && (
+                        <p className="text-xs text-yellow-500 mt-2">
+                          ⏳ Waiting for owner to grant NOVA access
+                        </p>
+                      )}
+                      {item.accessStatus === 'granted' && (
+                        <p className="text-xs text-green-500 mt-2">
+                          ✓ You can decrypt and download this file
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -336,7 +406,6 @@ const Profile = () => {
             </motion.div>
           )}
 
-        
         </div>
       </div>
     </PageTransition>

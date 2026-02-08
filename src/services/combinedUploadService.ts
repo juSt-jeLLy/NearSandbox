@@ -1,7 +1,7 @@
 import { uploadFile, registerGroup } from './novaService';
 import { Buffer } from 'buffer';
 
-const MARKETPLACE_CONTRACT = 'marketplace-1770490780.testnet';
+const MARKETPLACE_CONTRACT = 'marketplace-1770558741.testnet';
 
 export interface CombinedUploadResult {
   // NOVA upload results
@@ -25,38 +25,45 @@ export interface CombinedUploadProgress {
   message: string;
 }
 
-// Generate a unique sequential product ID based on timestamp
+
+const generateGroupId = (filename: string): string => {
+  // Remove file extension
+  const nameWithoutExt = filename.replace(/\.[^/.]+$/, '');
+  
+  // Sanitize - replace special characters with underscore
+  const sanitized = nameWithoutExt
+    .replace(/[^a-zA-Z0-9]/g, '_')
+    .toLowerCase();
+  
+  // Generate random 4-digit number
+  const random = Math.floor(Math.random() * 10000);
+  
+  // Format: filename_random
+  return `${sanitized}_${random}`;
+};
+
+
 const generateProductId = (): number => {
-  // Use timestamp + random component to ensure uniqueness
-  const timestamp = Date.now();
+  const timestampSeconds = Math.floor(Date.now() / 1000);
   const random = Math.floor(Math.random() * 1000);
-  return parseInt(`${timestamp}${random}`);
+  
+  // Create a number that won't exceed Number.MAX_SAFE_INTEGER
+  // Format: timestamp(10 digits) + random(3 digits) = 13 digits max
+  return timestampSeconds * 1000 + random;
 };
 
-// Extract filename without extension
-const getFilenameWithoutExtension = (filename: string): string => {
-  const lastDotIndex = filename.lastIndexOf('.');
-  if (lastDotIndex === -1) return filename;
-  return filename.substring(0, lastDotIndex);
-};
 
-/**
- * Combined upload flow:
- * 1. Register group on NOVA (using filename without extension)
- * 2. Upload file to NOVA
- * 3. Create marketplace listing on NEAR contract
- */
 export const uploadAndCreateListing = async (
   file: File,
   assetType: 'Image' | 'Dataset' | 'Audio' | 'Other',
   price: number,
   ownerAccount: string,
-  callFunction: any, // NEAR wallet callFunction from useNearWallet
+  callFunction: any,
   onProgress?: (progress: CombinedUploadProgress) => void
 ): Promise<CombinedUploadResult> => {
   
-  // Extract group ID from filename (without extension)
-  const groupId = getFilenameWithoutExtension(file.name);
+  // Generate group ID from filename + random number
+  const groupId = generateGroupId(file.name);
   
   // Generate unique product ID
   const productId = generateProductId();
@@ -68,15 +75,8 @@ export const uploadAndCreateListing = async (
       message: `Creating NOVA group: ${groupId}`
     });
     
-    try {
-      await registerGroup(groupId);
-      console.log(`✅ Group registered: ${groupId}`);
-    } catch (e: any) {
-      // Group might already exist, which is fine
-      if (!e.message?.includes('exists') && !e.message?.includes('already')) {
-        console.log('Group may already exist, continuing...');
-      }
-    }
+    await registerGroup(groupId);
+    console.log(`✅ Group registered: ${groupId}`);
     
     // Step 2: Upload file to NOVA
     onProgress?.({
@@ -84,11 +84,11 @@ export const uploadAndCreateListing = async (
       message: 'Encrypting and uploading to IPFS via NOVA...'
     });
     
-    // Read file as buffer
+    // Read file as Buffer directly (no double conversion)
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
+    const fileBuffer = Buffer.from(arrayBuffer);
     
-    const uploadResult = await uploadFile(groupId, buffer, file.name);
+    const uploadResult = await uploadFile(groupId, fileBuffer, file.name);
     console.log(`✅ File uploaded to NOVA. CID: ${uploadResult.cid}`);
     
     // Step 3: Create marketplace listing
@@ -137,6 +137,16 @@ export const uploadAndCreateListing = async (
     
   } catch (error: any) {
     console.error('Combined upload failed:', error);
+    
+    // Provide more specific error messages
+    if (error.message?.includes('not authorized')) {
+      throw new Error('Not authorized. Check your NOVA credentials at nova-sdk.com');
+    } else if (error.message?.includes('Insufficient')) {
+      throw new Error('Insufficient NEAR balance. Please add funds to your NOVA account at nova-sdk.com');
+    } else if (error.message?.includes('Session token')) {
+      throw new Error('Session expired. Your API key may be invalid. Generate a new one at nova-sdk.com');
+    }
+    
     throw new Error(`Upload failed: ${error.message || 'Unknown error'}`);
   }
 };
