@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Wallet, Shield, Activity, Copy, ExternalLink, RefreshCw, AlertCircle, Package, ShoppingCart, TrendingUp, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { User, Wallet, Shield, Activity, Copy, ExternalLink, RefreshCw, AlertCircle, Package, ShoppingCart, TrendingUp, Clock, CheckCircle, XCircle, Download, Loader2, UserPlus, TestTube } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,13 +11,18 @@ import {
   getUserProfileData,
   UserStats,
   ListingWithAccessInfo,
-  PurchasedItemWithAccessInfo 
+  PurchasedItemWithAccessInfo,
+  retrieveAndDownloadFile 
 } from '@/services/profileService';
+import { 
+  grantAccessToAllPendingBuyers,
+  getPendingAccessBuyers 
+} from '@/services/buyerAccessService';
 import { useNearWallet } from 'near-connect-hooks';
 import { toast } from 'sonner';
 
 const Profile = () => {
-  const { viewFunction, signedAccountId } = useNearWallet();
+  const { viewFunction, signedAccountId, callFunction } = useNearWallet();
   
   const [isConfigured, setIsConfigured] = useState(false);
   const [balance, setBalance] = useState<string | null>(null);
@@ -32,6 +37,13 @@ const Profile = () => {
   const [createdListings, setCreatedListings] = useState<ListingWithAccessInfo[]>([]);
   const [purchasedItems, setPurchasedItems] = useState<PurchasedItemWithAccessInfo[]>([]);
   const [loadingStats, setLoadingStats] = useState(false);
+  
+  // Grant access state
+  const [grantingAccessProductId, setGrantingAccessProductId] = useState<number | null>(null);
+  const [testingAccessProductId, setTestingAccessProductId] = useState<number | null>(null);
+  
+  // Download state
+  const [downloadingProductId, setDownloadingProductId] = useState<number | null>(null);
 
   useEffect(() => {
     setIsConfigured(isNovaConfigured());
@@ -106,6 +118,139 @@ const Profile = () => {
       toast.error('Failed to fetch transactions: ' + e.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDownloadFile = async (item: PurchasedItemWithAccessInfo) => {
+    if (!isConfigured) {
+      toast.error('NOVA not configured. Please set up your credentials.');
+      return;
+    }
+
+    setDownloadingProductId(item.product_id);
+    
+    try {
+      await retrieveAndDownloadFile(
+        item.nova_group_id,
+        item.cid,
+        item.product_id,
+        item.list_type
+      );
+    } catch (error) {
+      // Error handling is done in retrieveAndDownloadFile
+      console.error('Download failed:', error);
+    } finally {
+      setDownloadingProductId(null);
+    }
+  };
+
+  const handleGrantAccess = async (listing: ListingWithAccessInfo) => {
+    if (!isConfigured) {
+      toast.error('NOVA not configured. Cannot grant access without NOVA credentials.');
+      return;
+    }
+
+    if (!callFunction) {
+      toast.error('Wallet not connected');
+      return;
+    }
+
+    if (listing.pendingBuyers === 0) {
+      toast.info('No pending buyers to grant access');
+      return;
+    }
+
+    setGrantingAccessProductId(listing.product_id);
+    
+    try {
+      toast.info(`Granting access to ${listing.pendingBuyers} buyer(s)...`);
+      
+      const result = await grantAccessToAllPendingBuyers(
+        listing.product_id,
+        listing.nova_group_id,
+        viewFunction,
+        callFunction,
+        (current, total, buyer) => {
+          toast.info(`Processing ${current}/${total}: ${buyer}`);
+        }
+      );
+      
+      if (result.success.length > 0) {
+        toast.success(`✅ Granted access to ${result.success.length} buyer(s)`);
+      }
+      
+      if (result.failed.length > 0) {
+        toast.error(`❌ Failed to grant access to ${result.failed.length} buyer(s)`);
+      }
+      
+      // Refresh listings to show updated status
+      await fetchMarketplaceStats();
+      
+    } catch (error: any) {
+      console.error('Failed to grant access:', error);
+      toast.error(`Failed to grant access: ${error.message}`);
+    } finally {
+      setGrantingAccessProductId(null);
+    }
+  };
+
+  const handleTestGrantAccess = async (listing: ListingWithAccessInfo) => {
+    if (!callFunction) {
+      toast.error('Wallet not connected');
+      return;
+    }
+
+    if (listing.pendingBuyers === 0) {
+      toast.info('No pending buyers to test');
+      return;
+    }
+
+    setTestingAccessProductId(listing.product_id);
+    
+    try {
+      toast.info('Getting pending buyers...');
+      
+      // Get pending buyers
+      const pendingBuyers = await getPendingAccessBuyers(listing.product_id, viewFunction);
+      
+      if (pendingBuyers.length === 0) {
+        toast.info('No pending buyers found');
+        return;
+      }
+      
+      toast.info(`Testing: Marking ${pendingBuyers.length} buyer(s) as having access (contract only)...`);
+      
+      // Grant access to each buyer (CONTRACT ONLY - no NOVA)
+      for (let i = 0; i < pendingBuyers.length; i++) {
+        const buyer = pendingBuyers[i];
+        toast.info(`Processing ${i + 1}/${pendingBuyers.length}: ${buyer}`);
+        
+        try {
+          await callFunction({
+            contractId: 'marketplace-1770558741.testnet',
+            method: 'grant_buyer_access',
+            args: {
+              p_id: listing.product_id,
+              buyer: buyer,
+            },
+          });
+        } catch (error) {
+          console.error(`Failed to grant access to ${buyer}:`, error);
+          toast.error(`Failed for ${buyer}`);
+        }
+      }
+      
+      toast.success(`✅ Test complete: Updated contract for ${pendingBuyers.length} buyer(s)`);
+      toast.warning('⚠️ Note: Buyers still cannot decrypt files (no NOVA access)');
+      
+      // Refresh listings
+      await fetchMarketplaceStats();
+      
+    } catch (error: any) {
+      console.error('Test grant access failed:', error);
+      toast.error(`Test failed: ${error.message}`);
+    } finally {
+      setTestingAccessProductId(null);
     }
   };
 
@@ -312,20 +457,76 @@ const Profile = () => {
                       
                       {/* Buyer Access Status */}
                       {listing.buyers.length > 0 && (
-                        <div className="pt-2 border-t border-border/50 flex items-center gap-4 text-sm">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                            <span className="text-muted-foreground">
-                              {listing.activeBuyers} with access
-                            </span>
-                          </div>
-                          {listing.pendingBuyers > 0 && (
+                        <div className="pt-2 border-t border-border/50">
+                          <div className="flex items-center gap-4 text-sm mb-2">
                             <div className="flex items-center gap-2">
-                              <Clock className="h-4 w-4 text-yellow-500" />
+                              <CheckCircle className="h-4 w-4 text-green-500" />
                               <span className="text-muted-foreground">
-                                {listing.pendingBuyers} pending
+                                {listing.activeBuyers} with access
                               </span>
                             </div>
+                            {listing.pendingBuyers > 0 && (
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-yellow-500" />
+                                <span className="text-muted-foreground">
+                                  {listing.pendingBuyers} pending
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Action Buttons */}
+                          {listing.pendingBuyers > 0 && (
+                            <div className="flex gap-2 mt-2">
+                              {/* Grant Access Button - Full flow (NOVA + Contract) */}
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => handleGrantAccess(listing)}
+                                disabled={grantingAccessProductId === listing.product_id || !isConfigured}
+                              >
+                                {grantingAccessProductId === listing.product_id ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    Granting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserPlus className="h-3 w-3 mr-1" />
+                                    Grant Access ({listing.pendingBuyers})
+                                  </>
+                                )}
+                              </Button>
+                              
+                              {/* Test Button - Contract only (no NOVA) */}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => handleTestGrantAccess(listing)}
+                                disabled={testingAccessProductId === listing.product_id}
+                              >
+                                {testingAccessProductId === listing.product_id ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    Testing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <TestTube className="h-3 w-3 mr-1" />
+                                    Test ({listing.pendingBuyers})
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
+                          
+                          {/* Info messages */}
+                          {!isConfigured && listing.pendingBuyers > 0 && (
+                            <p className="text-xs text-yellow-500 mt-2">
+                              ⚠️ Configure NOVA to grant real access
+                            </p>
                           )}
                         </div>
                       )}
@@ -374,18 +575,44 @@ const Profile = () => {
                         </div>
                       </div>
                       
-                      {/* Access Status */}
-                      <div className="pt-2 border-t border-border/50 flex items-center justify-between">
+                      {/* Access Status and Actions */}
+                      <div className="pt-2 border-t border-border/50 flex items-center justify-between gap-2">
                         {getAccessBadge(item.accessStatus)}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-xs h-auto p-1"
-                          onClick={() => copyToClipboard(item.cid, 'CID')}
-                        >
-                          <Copy className="h-3 w-3 mr-1" />
-                          Copy CID
-                        </Button>
+                        
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs h-auto p-1"
+                            onClick={() => copyToClipboard(item.cid, 'CID')}
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            Copy CID
+                          </Button>
+                          
+                          {/* Download Button - Only show if access is granted */}
+                          {item.accessStatus === 'granted' && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="text-xs h-auto py-1 px-2"
+                              onClick={() => handleDownloadFile(item)}
+                              disabled={downloadingProductId === item.product_id || !isConfigured}
+                            >
+                              {downloadingProductId === item.product_id ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  Downloading...
+                                </>
+                              ) : (
+                                <>
+                                  <Download className="h-3 w-3 mr-1" />
+                                  Download
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       
                       {/* Access Message */}

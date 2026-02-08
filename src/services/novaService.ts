@@ -82,7 +82,7 @@ export const uploadFile = async (
 ): Promise<UploadResult> => {
   const sdk = getNovaSDK();
   
-  // Ensure we have a Buffer (not Uint8Array)
+  // Ensure we have a Buffer (works in both environments)
   const buffer = Buffer.isBuffer(fileData) ? fileData : Buffer.from(fileData);
   
   const result = await sdk.upload(groupId, buffer, filename);

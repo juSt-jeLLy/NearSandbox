@@ -84,7 +84,7 @@ export const uploadAndCreateListing = async (
       message: 'Encrypting and uploading to IPFS via NOVA...'
     });
     
-    // Read file as Buffer directly (no double conversion)
+    // Read file as ArrayBuffer and convert to Buffer (works in both environments)
     const arrayBuffer = await file.arrayBuffer();
     const fileBuffer = Buffer.from(arrayBuffer);
     
