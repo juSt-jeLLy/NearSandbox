@@ -4,12 +4,8 @@ import { Search, Filter, Grid, List, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import PageTransition from '@/components/PageTransition';
-import { OpenAPI, QuoteRequest, OneClickService } from '@defuse-protocol/one-click-sdk-typescript';
 import { useMarketplaceListings } from '@/components/useMarketplaceListings';
 import { ProductCard } from '@/components/ProductCard';
-
-OpenAPI.BASE = 'https://1click.chaindefuser.com';
-OpenAPI.TOKEN = process.env.TOKEN;
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -33,56 +29,10 @@ const itemVariants = {
 const Marketplace = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [buyingListingId, setBuyingListingId] = useState<number | null>(null);
 
   // Fetch listings from NEAR contract
-  const { listings, loading, error, buyListing } = useMarketplaceListings();
-
-  const onBuyClick = async (listing: any) => {
-    console.log('Buy clicked for listing:', listing);
-    setBuyingListingId(listing.product_id);
-    
-    try {
-      const deadline = new Date();
-      deadline.setHours(deadline.getHours() + 24);
-      
-      const quoteRequest: QuoteRequest = {
-        dry: false,
-        swapType: QuoteRequest.swapType.EXACT_INPUT,
-        slippageTolerance: 100,
-        originAsset: 'nep141:arb-0xaf88d065e77c8cc2239327c5edb3a432268e5831.omft.near',
-        depositType: QuoteRequest.depositType.ORIGIN_CHAIN,
-        destinationAsset: 'nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near',
-        amount: '1000000',
-        refundTo: '0x2527D02599Ba641c19FEa793cD0F167589a0f10D',
-        refundType: QuoteRequest.refundType.ORIGIN_CHAIN, 
-        recipient: '13QkxhNMrTPxoCkRdYdJ65tFuwXPhL5gLS2Z5Nr6gjRK',
-        recipientType: QuoteRequest.recipientType.DESTINATION_CHAIN,
-        deadline: deadline.toISOString()
-      };
-      
-      console.log('Requesting quote with:', JSON.stringify(quoteRequest, null, 2));
-      
-      const quote = await OneClickService.getQuote(quoteRequest);
-      console.log('Quote received:', quote);
-      await buyListing(listing.product_id);
-    } catch (err: any) {
-      console.error('Failed to get quote:', err);
-      
-      let errorMessage = 'Failed to get quote. Please try again.';
-      
-      if (err.body) {
-        console.error('Error body:', err.body);
-        errorMessage = `API Error: ${err.body.message || err.body.error || JSON.stringify(err.body)}`;
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      console.error('Error message:', errorMessage);
-    } finally {
-      setBuyingListingId(null);
-    }
-  };
+  // buyListing now handles all the buy logic internally
+  const { listings, loading, error, buyListing, buyingListingId } = useMarketplaceListings();
 
   const filteredListings = listings.filter(
     (listing) =>
@@ -183,7 +133,7 @@ const Marketplace = () => {
                 <motion.div key={listing.product_id} variants={itemVariants}>
                   <ProductCard
                     listing={listing}
-                    onBuy={() => onBuyClick(listing)}
+                    onBuy={buyListing}
                     isBuying={buyingListingId === listing.product_id}
                   />
                 </motion.div>
@@ -203,7 +153,7 @@ const Marketplace = () => {
                 <motion.div key={listing.product_id} variants={itemVariants}>
                   <ProductCard
                     listing={listing}
-                    onBuy={onBuyClick}
+                    onBuy={buyListing}
                     isBuying={buyingListingId === listing.product_id}
                   />
                 </motion.div>

@@ -18,11 +18,12 @@ export const getNovaSDK = (): NovaSdk => {
   }
   
   if (!sdkInstance) {
+    // MAINNET ONLY - No testnet support
     sdkInstance = new NovaSdk(NOVA_ACCOUNT_ID, {
-      apiKey: NOVA_API_KEY,
-      rpcUrl: 'https://rpc.testnet.near.org',
-      contractId: 'nova-sdk-6.testnet',
+      apiKey: NOVA_API_KEY
     });
+    console.log('🔷 NOVA SDK initialized on MAINNET');
+    console.log('⚠️  All operations will use real NEAR tokens');
   }
   
   return sdkInstance;
@@ -68,7 +69,7 @@ export const isAuthorized = async (groupId: string, userId?: string): Promise<bo
   return await sdk.isAuthorized(groupId, userId);
 };
 
-export const getGroupOwner = async (groupId: string): Promise<string> => {
+export const getGroupOwner = async (groupId: string): Promise<string | null> => {
   const sdk = getNovaSDK();
   return await sdk.getGroupOwner(groupId);
 };
@@ -80,14 +81,18 @@ export const uploadFile = async (
   filename: string
 ): Promise<UploadResult> => {
   const sdk = getNovaSDK();
-  const result = await sdk.upload(groupId, Buffer.from(fileData), filename);
+  
+  // Ensure we have a Buffer (works in both environments)
+  const buffer = Buffer.isBuffer(fileData) ? fileData : Buffer.from(fileData);
+  
+  const result = await sdk.upload(groupId, buffer, filename);
   
   return {
     cid: result.cid,
     trans_id: result.trans_id,
     file_hash: result.file_hash,
     filename,
-    size: fileData.length,
+    size: buffer.length,
     uploadedAt: new Date().toISOString(),
   };
 };
@@ -130,6 +135,7 @@ export const getNetworkInfo = () => {
 // Utility
 export const computeHash = async (data: Buffer | Uint8Array): Promise<string> => {
   const sdk = getNovaSDK();
-  const result = await sdk.computeHashAsync(Buffer.from(data));
+  const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+  const result = await sdk.computeHashAsync(buffer);
   return String(result);
 };
