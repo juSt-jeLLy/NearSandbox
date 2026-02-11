@@ -14,10 +14,13 @@ import {
 } from '@/services/profileService';
 import { 
   grantAccessToAllPendingBuyers,
+  testGrantAccessToAllPendingBuyers,
   getPendingAccessBuyers 
 } from '@/services/buyerAccessService';
 import { useNearWallet } from 'near-connect-hooks';
 import { toast } from 'sonner';
+
+const MARKETPLACE_CONTRACT = 'marketplace-1770849736.testnet';
 
 const Profile = () => {
   const { viewFunction, signedAccountId, callFunction } = useNearWallet();
@@ -30,34 +33,28 @@ const Profile = () => {
   const [groupIdInput, setGroupIdInput] = useState('');
   const [transactions, setTransactions] = useState<any[]>([]);
   
-  // Marketplace stats with access info
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [createdListings, setCreatedListings] = useState<ListingWithAccessInfo[]>([]);
   const [purchasedItems, setPurchasedItems] = useState<PurchasedItemWithAccessInfo[]>([]);
   const [loadingStats, setLoadingStats] = useState(false);
   
-  // Grant access state
   const [grantingAccessProductId, setGrantingAccessProductId] = useState<number | null>(null);
   const [testingAccessProductId, setTestingAccessProductId] = useState<number | null>(null);
-  
-  // Download state
   const [downloadingProductId, setDownloadingProductId] = useState<number | null>(null);
 
-
-useEffect(() => {
-  if (signedAccountId) {  
-    setIsConfigured(isNovaConfigured(signedAccountId)); 
-    if (isNovaConfigured(signedAccountId)) {
-      try {
-        setNetworkInfo(getNetworkInfo(signedAccountId));  
-      } catch (e) {
-        console.error('Failed to get network info:', e);
+  useEffect(() => {
+    if (signedAccountId) {  
+      setIsConfigured(isNovaConfigured(signedAccountId)); 
+      if (isNovaConfigured(signedAccountId)) {
+        try {
+          setNetworkInfo(getNetworkInfo(signedAccountId));  
+        } catch (e) {
+          console.error('Failed to get network info:', e);
+        }
       }
     }
-  }
-}, [signedAccountId]);
+  }, [signedAccountId]);
 
-  // Fetch marketplace stats when user connects wallet
   useEffect(() => {
     if (signedAccountId && viewFunction) {
       fetchMarketplaceStats();
@@ -89,7 +86,6 @@ useEffect(() => {
     
     setLoadingStats(true);
     try {
-      // Use the comprehensive profile data function
       const profileData = await getUserProfileData(viewFunction, signedAccountId);
       
       setUserStats(profileData.stats);
@@ -131,15 +127,14 @@ useEffect(() => {
     setDownloadingProductId(item.product_id);
     
     try {
-await retrieveAndDownloadFile(
-  item.nova_group_id,
-  item.cid,
-  item.product_id,
-  item.list_type,
-  signedAccountId  // CRITICAL: Pass buyer's wallet
-);
+      await retrieveAndDownloadFile(
+        item.nova_group_id,
+        item.cid,
+        item.product_id,
+        item.list_type,
+        signedAccountId
+      );
     } catch (error) {
-      // Error handling is done in retrieveAndDownloadFile
       console.error('Download failed:', error);
     } finally {
       setDownloadingProductId(null);
@@ -152,7 +147,7 @@ await retrieveAndDownloadFile(
       return;
     }
 
-    if (!callFunction) {
+    if (!callFunction || !viewFunction) {
       toast.error('Wallet not connected');
       return;
     }
@@ -167,16 +162,17 @@ await retrieveAndDownloadFile(
     try {
       toast.info(`Granting access to ${listing.pendingBuyers} buyer(s)...`);
       
-const result = await grantAccessToAllPendingBuyers(
-  listing.product_id,
-  listing.nova_group_id,
-  viewFunction,
-  callFunction,
-  signedAccountId!,  // CRITICAL: Pass owner's wallet (add ! since we know it exists here)
-  (current, total, buyer) => {
-    toast.info(`Processing ${current}/${total}: ${buyer}`);
-  }
-);
+      const result = await grantAccessToAllPendingBuyers(
+        listing.product_id,
+        listing.nova_group_id,
+        viewFunction,
+        callFunction,
+        signedAccountId!,
+        (current, total, buyer) => {
+          toast.info(`Processing ${current}/${total}: ${buyer}`);
+        }
+      );
+      
       if (result.success.length > 0) {
         toast.success(`✅ Granted access to ${result.success.length} buyer(s)`);
       }
@@ -185,7 +181,6 @@ const result = await grantAccessToAllPendingBuyers(
         toast.error(`❌ Failed to grant access to ${result.failed.length} buyer(s)`);
       }
       
-      // Refresh listings to show updated status
       await fetchMarketplaceStats();
       
     } catch (error: any) {
@@ -197,7 +192,7 @@ const result = await grantAccessToAllPendingBuyers(
   };
 
   const handleTestGrantAccess = async (listing: ListingWithAccessInfo) => {
-    if (!callFunction) {
+    if (!callFunction || !viewFunction) {
       toast.error('Wallet not connected');
       return;
     }
@@ -210,42 +205,26 @@ const result = await grantAccessToAllPendingBuyers(
     setTestingAccessProductId(listing.product_id);
     
     try {
-      toast.info('Getting pending buyers...');
+      toast.info('Starting test mode (contract only, no NOVA)...');
       
-      // Get pending buyers
-      const pendingBuyers = await getPendingAccessBuyers(listing.product_id, viewFunction);
-      
-      if (pendingBuyers.length === 0) {
-        toast.info('No pending buyers found');
-        return;
-      }
-      
-      toast.info(`Testing: Marking ${pendingBuyers.length} buyer(s) as having access (contract only)...`);
-      
-      // Grant access to each buyer (CONTRACT ONLY - no NOVA)
-      for (let i = 0; i < pendingBuyers.length; i++) {
-        const buyer = pendingBuyers[i];
-        toast.info(`Processing ${i + 1}/${pendingBuyers.length}: ${buyer}`);
-        
-        try {
-          await callFunction({
-            contractId: 'marketplace-1770558741.testnet',
-            method: 'grant_buyer_access',
-            args: {
-              p_id: listing.product_id,
-              buyer: buyer,
-            },
-          });
-        } catch (error) {
-          console.error(`Failed to grant access to ${buyer}:`, error);
-          toast.error(`Failed for ${buyer}`);
+      const result = await testGrantAccessToAllPendingBuyers(
+        listing.product_id,
+        viewFunction,
+        callFunction,
+        (current, total, buyer) => {
+          toast.info(`Processing ${current}/${total}: ${buyer}`);
         }
+      );
+      
+      if (result.success.length > 0) {
+        toast.success(`✅ Test complete: Updated contract for ${result.success.length} buyer(s)`);
+      }
+      if (result.failed.length > 0) {
+        toast.error(`❌ Failed to update contract for ${result.failed.length} buyer(s)`);
       }
       
-      toast.success(`✅ Test complete: Updated contract for ${pendingBuyers.length} buyer(s)`);
-      toast.warning('⚠️ Note: Buyers still cannot decrypt files (no NOVA access)');
+      toast.warning('⚠️ NOTE: This is CONTRACT ONLY - buyers still CANNOT decrypt files');
       
-      // Refresh listings
       await fetchMarketplaceStats();
       
     } catch (error: any) {
@@ -291,7 +270,6 @@ const result = await grantAccessToAllPendingBuyers(
     <PageTransition>
       <div className="px-4 py-12 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl">
-          {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -305,7 +283,6 @@ const result = await grantAccessToAllPendingBuyers(
             </p>
           </motion.div>
 
-          {/* Marketplace Statistics */}
           {signedAccountId && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -326,7 +303,6 @@ const result = await grantAccessToAllPendingBuyers(
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Listings Created */}
                 <GlowCard>
                   <div className="flex items-center justify-between">
                     <div>
@@ -341,7 +317,6 @@ const result = await grantAccessToAllPendingBuyers(
                   </div>
                 </GlowCard>
 
-                {/* Items Purchased */}
                 <GlowCard>
                   <div className="flex items-center justify-between">
                     <div>
@@ -356,7 +331,6 @@ const result = await grantAccessToAllPendingBuyers(
                   </div>
                 </GlowCard>
 
-                {/* Total Spent */}
                 <GlowCard>
                   <div className="flex items-center justify-between">
                     <div>
@@ -374,7 +348,6 @@ const result = await grantAccessToAllPendingBuyers(
             </motion.div>
           )}
 
-          {/* Created Listings Summary with Access Info */}
           {signedAccountId && createdListings.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -415,7 +388,6 @@ const result = await grantAccessToAllPendingBuyers(
                         </div>
                       </div>
                       
-                      {/* Buyer Access Status */}
                       {listing.buyers.length > 0 && (
                         <div className="pt-2 border-t border-border/50">
                           <div className="flex items-center gap-4 text-sm mb-2">
@@ -435,10 +407,8 @@ const result = await grantAccessToAllPendingBuyers(
                             )}
                           </div>
                           
-                          {/* Action Buttons */}
                           {listing.pendingBuyers > 0 && (
                             <div className="flex gap-2 mt-2">
-                              {/* Grant Access Button - Full flow (NOVA + Contract) */}
                               <Button
                                 variant="default"
                                 size="sm"
@@ -459,7 +429,6 @@ const result = await grantAccessToAllPendingBuyers(
                                 )}
                               </Button>
                               
-                              {/* Test Button - Contract only (no NOVA) */}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -482,7 +451,6 @@ const result = await grantAccessToAllPendingBuyers(
                             </div>
                           )}
                           
-                          {/* Info messages */}
                           {!isConfigured && listing.pendingBuyers > 0 && (
                             <p className="text-xs text-yellow-500 mt-2">
                               ⚠️ Configure NOVA to grant real access
@@ -497,7 +465,6 @@ const result = await grantAccessToAllPendingBuyers(
             </motion.div>
           )}
 
-          {/* Purchased Items Summary with Access Status */}
           {signedAccountId && purchasedItems.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -535,7 +502,6 @@ const result = await grantAccessToAllPendingBuyers(
                         </div>
                       </div>
                       
-                      {/* Access Status and Actions */}
                       <div className="pt-2 border-t border-border/50 flex items-center justify-between gap-2">
                         {getAccessBadge(item.accessStatus)}
                         
@@ -550,7 +516,6 @@ const result = await grantAccessToAllPendingBuyers(
                             Copy CID
                           </Button>
                           
-                          {/* Download Button - Only show if access is granted */}
                           {item.accessStatus === 'granted' && (
                             <Button
                               variant="default"
@@ -575,7 +540,6 @@ const result = await grantAccessToAllPendingBuyers(
                         </div>
                       </div>
                       
-                      {/* Access Message */}
                       {item.accessStatus === 'pending' && (
                         <p className="text-xs text-yellow-500 mt-2">
                           ⏳ Waiting for owner to grant NOVA access
