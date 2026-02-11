@@ -1,3 +1,6 @@
+// CRITICAL: Import the fetch interceptor FIRST, before any other imports
+import './services/novaProxyInterceptor';
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";

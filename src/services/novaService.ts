@@ -70,6 +70,9 @@ const getCurrentWallet = (): string | null => {
 /**
  * Get (or create) a NovaSdk instance for the given NEAR wallet.
  * Reads credentials from browser localStorage (novaCredentialsService).
+ * 
+ * Note: API requests are automatically proxied through Vite dev server
+ * via the fetch interceptor in novaProxyInterceptor.ts
  */
 export const getNovaSDK = (nearWallet?: string): NovaSdk => {
   // Resolve which wallet to use
@@ -103,11 +106,14 @@ export const getNovaSDK = (nearWallet?: string): NovaSdk => {
   console.log(`   NOVA Account: ${creds.accountId}`);
   console.log(`   API Key: ${creds.apiKey.substring(0, 15)}...`);
 
+  // Initialize SDK normally - fetch interceptor handles proxy routing
   const sdk = new NovaSdk(creds.accountId, {
     apiKey: creds.apiKey,
   });
 
   console.log(`✅ NOVA SDK initialized successfully`);
+  console.log(`   (API calls will be proxied in development mode)`);
+  
   sdkCache[wallet] = sdk;
   return sdk;
 };

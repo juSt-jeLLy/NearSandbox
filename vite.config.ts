@@ -25,10 +25,19 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // Proxy for NOVA SDK API
       '/api': {
         target: 'https://nova-sdk.com',
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path,
+      },
+      // Proxy for NOVA MCP API
+      '/mcp-api': {
+        target: 'https://nova-mcp.fastmcp.app',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/mcp-api/, ''),
       },
     },
   },
