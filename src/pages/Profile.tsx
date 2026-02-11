@@ -43,16 +43,19 @@ const Profile = () => {
   // Download state
   const [downloadingProductId, setDownloadingProductId] = useState<number | null>(null);
 
-  useEffect(() => {
-    setIsConfigured(isNovaConfigured());
-    if (isNovaConfigured()) {
+
+useEffect(() => {
+  if (signedAccountId) {  
+    setIsConfigured(isNovaConfigured(signedAccountId)); 
+    if (isNovaConfigured(signedAccountId)) {
       try {
-        setNetworkInfo(getNetworkInfo());
+        setNetworkInfo(getNetworkInfo(signedAccountId));  
       } catch (e) {
         console.error('Failed to get network info:', e);
       }
     }
-  }, []);
+  }
+}, [signedAccountId]);
 
   // Fetch marketplace stats when user connects wallet
   useEffect(() => {

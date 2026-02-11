@@ -11,6 +11,10 @@
  * Import this BEFORE any NOVA SDK usage (ideally in App.tsx)
  */
 
+/**
+ * NOVA SDK Request Interceptor (Development + Production)
+ */
+
 // NOVA SDK domains to proxy
 const NOVA_DOMAINS = [
   'nova-sdk.com',
@@ -18,22 +22,29 @@ const NOVA_DOMAINS = [
 ];
 
 const shouldProxy = (url: string): boolean => {
-  return import.meta.env.DEV && NOVA_DOMAINS.some(domain => url.includes(domain));
+  return NOVA_DOMAINS.some(domain => url.includes(domain));
 };
 
 const getProxyUrl = (url: string): string => {
-  // For nova-sdk.com/api -> /api
+  // In production (Vercel), use /api routes
+  // In development, use Vite proxy paths
+  
   if (url.includes('nova-sdk.com/api')) {
-    return url.replace('https://nova-sdk.com', '');
+    return import.meta.env.DEV 
+      ? url.replace('https://nova-sdk.com', '')  // Dev: /api/...
+      : url.replace('https://nova-sdk.com/api', '/api/nova-sdk');  // Prod: /api/nova-sdk/...
   }
   
-  // For nova-mcp.fastmcp.app -> /mcp-api
   if (url.includes('nova-mcp.fastmcp.app')) {
-    return url.replace('https://nova-mcp.fastmcp.app', '/mcp-api');
+    return import.meta.env.DEV
+      ? url.replace('https://nova-mcp.fastmcp.app', '/mcp-api')  // Dev: /mcp-api/...
+      : url.replace('https://nova-mcp.fastmcp.app', '/api/nova-mcp');  // Prod: /api/nova-mcp/...
   }
   
   return url;
 };
+
+// ... rest of interceptor code stays the same
 
 // ============================================================================
 // FETCH INTERCEPTOR
