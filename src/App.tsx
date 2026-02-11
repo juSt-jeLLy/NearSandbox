@@ -1,3 +1,6 @@
+// CRITICAL: Import the fetch interceptor FIRST, before any other imports
+import './services/novaProxyInterceptor';
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +9,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { NearProvider } from "near-connect-hooks";
 import Navbar from "./components/Navbar";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Upload from "./pages/Upload";
 import Marketplace from "./pages/Marketplace";
@@ -18,9 +22,9 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <NearProvider 
       config={{
-        network: "testnet",
+        network: "mainnet",
         providers: {
-          testnet: ["https://rpc.testnet.near.org"]
+          mainnet: ["https://rpc.mainnet.near.org"]
         }
       }}
     >
@@ -31,10 +35,36 @@ const App = () => (
           <Navbar />
           <AnimatePresence mode="wait">
             <Routes>
+              {/* Public route - accessible without wallet */}
               <Route path="/" element={<Index />} />
-              <Route path="/upload" element={<Upload />} />
-              <Route path="/marketplace" element={<Marketplace />} />
-              <Route path="/profile" element={<Profile />} />
+              
+              {/* Protected routes - require wallet connection */}
+              <Route 
+                path="/upload" 
+                element={
+                  <ProtectedRoute>
+                    <Upload />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/marketplace" 
+                element={
+                  <ProtectedRoute>
+                    <Marketplace />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/profile" 
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* 404 route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AnimatePresence>

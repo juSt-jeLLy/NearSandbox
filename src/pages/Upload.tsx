@@ -66,8 +66,10 @@ const Upload = () => {
       return;
     }
 
-    if (!isNovaConfigured()) {
-      setError('NOVA credentials not configured. Please set VITE_NOVA_ACCOUNT_ID and VITE_NOVA_API_KEY in your environment.');
+    // Check if NOVA credentials are configured for this wallet
+    if (!isNovaConfigured(signedAccountId)) {
+      setError('NOVA credentials not configured. Please set up your NOVA account using the "Setup NOVA" button in the navigation bar.');
+      toast.error('Please configure your NOVA credentials first');
       return;
     }
 
@@ -144,6 +146,25 @@ const Upload = () => {
               Encrypt and upload your files securely to IPFS via NOVA Protocol
             </p>
           </motion.div>
+
+          {/* NOVA Setup Warning */}
+          {signedAccountId && !isNovaConfigured(signedAccountId) && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                <AlertCircle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-semibold text-yellow-500 mb-1">NOVA Credentials Required</p>
+                  <p className="text-sm text-muted-foreground">
+                    Before you can upload files, please configure your NOVA credentials using the "Setup NOVA" button in the navigation bar.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
           <GlowCard glowOnHover={false} className="mb-6">
             <div className="space-y-6">
@@ -263,7 +284,7 @@ const Upload = () => {
               {/* Upload Button */}
               <Button
                 onClick={handleUpload}
-                disabled={!file || !price.trim() || isUploading || !signedAccountId}
+                disabled={!file || !price.trim() || isUploading || !signedAccountId || !isNovaConfigured(signedAccountId)}
                 className="w-full glow"
                 size="lg"
               >
@@ -283,6 +304,12 @@ const Upload = () => {
               {!signedAccountId && (
                 <p className="text-sm text-center text-muted-foreground">
                   Please connect your NEAR wallet to upload and list files
+                </p>
+              )}
+              
+              {signedAccountId && !isNovaConfigured(signedAccountId) && (
+                <p className="text-sm text-center text-yellow-500">
+                  Please configure your NOVA credentials to enable uploads
                 </p>
               )}
             </div>

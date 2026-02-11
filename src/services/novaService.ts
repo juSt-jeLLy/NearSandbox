@@ -1,36 +1,140 @@
 import { NovaSdk } from 'nova-sdk-js';
 import { Buffer } from 'buffer';
+import { getNovaCredentials, hasNovaCredentials } from './novaCredentialsService';
 
 // Polyfill Buffer for browser environment
 if (typeof window !== 'undefined' && typeof window.Buffer === 'undefined') {
   (window as any).Buffer = Buffer;
 }
 
-// Environment variables - user will set these
-const NOVA_ACCOUNT_ID = import.meta.env.VITE_NOVA_ACCOUNT_ID || '';
-const NOVA_API_KEY = import.meta.env.VITE_NOVA_API_KEY || '';
+// Cache SDK instances per wallet to avoid re-creating them on every call
+const sdkCache: Record<string, NovaSdk> = {};
 
-let sdkInstance: NovaSdk | null = null;
-
-export const getNovaSDK = (): NovaSdk => {
-  if (!NOVA_ACCOUNT_ID || !NOVA_API_KEY) {
-    throw new Error('NOVA credentials not configured. Please set VITE_NOVA_ACCOUNT_ID and VITE_NOVA_API_KEY environment variables.');
-  }
+/**
+ * Try to read the currently connected wallet from multiple possible localStorage keys.
+ * near-wallet-selector can store wallet info in different keys depending on configuration.
+ */
+const getCurrentWallet = (): string | null => {
+  if (typeof window === 'undefined') return null;
   
-  if (!sdkInstance) {
-    // MAINNET ONLY - No testnet support
-    sdkInstance = new NovaSdk(NOVA_ACCOUNT_ID, {
-      apiKey: NOVA_API_KEY
-    });
-    console.log('🔷 NOVA SDK initialized on MAINNET');
-    console.log('⚠️  All operations will use real NEAR tokens');
+  try {
+    // Try multiple possible keys where wallet info might be stored
+    const possibleKeys = [
+      'near_app_wallet_auth_key',
+      'undefined_wallet_auth_key',
+      'near-wallet-selector:selectedWalletId',
+      'near-wallet-selector:recentlySignedInWallets',
+    ];
+    
+    for (const key of possibleKeys) {
+      const stored = localStorage.getItem(key);
+      if (!stored) continue;
+      
+      try {
+        const parsed = JSON.parse(stored);
+        
+        // Handle different data structures
+        if (typeof parsed === 'string' && parsed.includes('.near')) {
+          console.log(`✅ Found wallet in ${key}: ${parsed}`);
+          return parsed;
+        }
+        if (parsed?.accountId) {
+          console.log(`✅ Found wallet in ${key}: ${parsed.accountId}`);
+          return parsed.accountId;
+        }
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // For recentlySignedInWallets array
+          const wallet = parsed[0];
+          if (typeof wallet === 'string' && wallet.includes('.near')) {
+            console.log(`✅ Found wallet in ${key}: ${wallet}`);
+            return wallet;
+          }
+        }
+      } catch (parseError) {
+        // If JSON parse fails, maybe it's a plain string
+        if (stored.includes('.near')) {
+          console.log(`✅ Found wallet in ${key} (plain): ${stored}`);
+          return stored;
+        }
+      }
+    }
+    
+    console.warn('⚠️ Could not find wallet in any localStorage key');
+    return null;
+  } catch (error) {
+    console.error('Error reading wallet from localStorage:', error);
+    return null;
   }
-  
-  return sdkInstance;
 };
 
-export const isNovaConfigured = (): boolean => {
-  return !!(NOVA_ACCOUNT_ID && NOVA_API_KEY);
+/**
+ * Get (or create) a NovaSdk instance for the given NEAR wallet.
+ * Reads credentials from browser localStorage (novaCredentialsService).
+ * 
+ * Note: API requests are automatically proxied through Vite dev server
+ * via the fetch interceptor in novaProxyInterceptor.ts
+ */
+export const getNovaSDK = (nearWallet?: string): NovaSdk => {
+  // Resolve which wallet to use
+  const wallet = nearWallet ?? getCurrentWallet();
+
+  if (!wallet) {
+    console.error('❌ No wallet provided and could not detect current wallet');
+    throw new Error('No NEAR wallet connected. Please connect your wallet first.');
+  }
+
+  console.log(`🔍 Getting NOVA SDK for wallet: ${wallet}`);
+
+  if (!hasNovaCredentials(wallet)) {
+    console.error(`❌ No NOVA credentials found for wallet: ${wallet}`);
+    throw new Error('NOVA credentials not configured. Please set up your NOVA account in the navbar settings.');
+  }
+
+  // Return cached instance if available
+  if (sdkCache[wallet]) {
+    console.log(`✅ Using cached SDK for wallet: ${wallet}`);
+    return sdkCache[wallet];
+  }
+
+  const creds = getNovaCredentials(wallet);
+  if (!creds) {
+    console.error(`❌ Failed to load credentials for wallet: ${wallet}`);
+    throw new Error('Failed to load NOVA credentials from browser storage.');
+  }
+
+  console.log(`🔷 Initializing new NOVA SDK for wallet: ${wallet}`);
+  console.log(`   NOVA Account: ${creds.accountId}`);
+  console.log(`   API Key: ${creds.apiKey.substring(0, 15)}...`);
+
+  // Initialize SDK normally - fetch interceptor handles proxy routing
+  const sdk = new NovaSdk(creds.accountId, {
+    apiKey: creds.apiKey,
+  });
+
+  console.log(`✅ NOVA SDK initialized successfully`);
+  console.log(`   (API calls will be proxied in development mode)`);
+  
+  sdkCache[wallet] = sdk;
+  return sdk;
+};
+
+/**
+ * Invalidate the cached SDK for a wallet (call this after credentials are updated/deleted).
+ */
+export const invalidateNovaSDKCache = (nearWallet: string): void => {
+  delete sdkCache[nearWallet];
+  console.log(`🗑️ Invalidated SDK cache for wallet: ${nearWallet}`);
+};
+
+export const isNovaConfigured = (nearWallet?: string): boolean => {
+  const wallet = nearWallet ?? getCurrentWallet();
+  if (!wallet) {
+    console.warn('⚠️ Cannot check NOVA config: no wallet specified or detected');
+    return false;
+  }
+  const configured = hasNovaCredentials(wallet);
+  console.log(`🔍 NOVA configured for ${wallet}: ${configured}`);
+  return configured;
 };
 
 export interface UploadResult {
@@ -49,28 +153,37 @@ export interface RetrieveResult {
 }
 
 // Group Management
-export const registerGroup = async (groupId: string): Promise<string> => {
-  const sdk = getNovaSDK();
-  return await sdk.registerGroup(groupId);
+export const registerGroup = async (groupId: string, nearWallet?: string): Promise<string> => {
+  console.log(`📝 Registering group: ${groupId} for wallet: ${nearWallet || 'auto-detect'}`);
+  const sdk = getNovaSDK(nearWallet);
+  const result = await sdk.registerGroup(groupId);
+  console.log(`✅ Group registered successfully: ${groupId}`);
+  return result;
 };
 
-export const addGroupMember = async (groupId: string, memberId: string): Promise<string> => {
-  const sdk = getNovaSDK();
-  return await sdk.addGroupMember(groupId, memberId);
+export const addGroupMember = async (groupId: string, memberId: string, nearWallet?: string): Promise<string> => {
+  console.log(`👥 Adding member ${memberId} to group: ${groupId}`);
+  const sdk = getNovaSDK(nearWallet);
+  const result = await sdk.addGroupMember(groupId, memberId);
+  console.log(`✅ Member added successfully`);
+  return result;
 };
 
-export const revokeGroupMember = async (groupId: string, memberId: string): Promise<string> => {
-  const sdk = getNovaSDK();
-  return await sdk.revokeGroupMember(groupId, memberId);
+export const revokeGroupMember = async (groupId: string, memberId: string, nearWallet?: string): Promise<string> => {
+  console.log(`🚫 Revoking member ${memberId} from group: ${groupId}`);
+  const sdk = getNovaSDK(nearWallet);
+  const result = await sdk.revokeGroupMember(groupId, memberId);
+  console.log(`✅ Member revoked successfully`);
+  return result;
 };
 
-export const isAuthorized = async (groupId: string, userId?: string): Promise<boolean> => {
-  const sdk = getNovaSDK();
+export const isAuthorized = async (groupId: string, userId?: string, nearWallet?: string): Promise<boolean> => {
+  const sdk = getNovaSDK(nearWallet);
   return await sdk.isAuthorized(groupId, userId);
 };
 
-export const getGroupOwner = async (groupId: string): Promise<string | null> => {
-  const sdk = getNovaSDK();
+export const getGroupOwner = async (groupId: string, nearWallet?: string): Promise<string | null> => {
+  const sdk = getNovaSDK(nearWallet);
   return await sdk.getGroupOwner(groupId);
 };
 
@@ -78,15 +191,18 @@ export const getGroupOwner = async (groupId: string): Promise<string | null> => 
 export const uploadFile = async (
   groupId: string,
   fileData: Buffer | Uint8Array,
-  filename: string
+  filename: string,
+  nearWallet?: string
 ): Promise<UploadResult> => {
-  const sdk = getNovaSDK();
-  
-  // Ensure we have a Buffer (works in both environments)
+  console.log(`📤 Uploading file: ${filename} to group: ${groupId}`);
+  const sdk = getNovaSDK(nearWallet);
+
   const buffer = Buffer.isBuffer(fileData) ? fileData : Buffer.from(fileData);
+  console.log(`   File size: ${buffer.length} bytes`);
   
   const result = await sdk.upload(groupId, buffer, filename);
-  
+  console.log(`✅ File uploaded successfully. CID: ${result.cid}`);
+
   return {
     cid: result.cid,
     trans_id: result.trans_id,
@@ -99,42 +215,46 @@ export const uploadFile = async (
 
 export const retrieveFile = async (
   groupId: string,
-  cid: string
+  cid: string,
+  nearWallet?: string
 ): Promise<RetrieveResult> => {
-  const sdk = getNovaSDK();
-  return await sdk.retrieve(groupId, cid);
+  console.log(`📥 Retrieving file from group: ${groupId}, CID: ${cid}`);
+  const sdk = getNovaSDK(nearWallet);
+  const result = await sdk.retrieve(groupId, cid);
+  console.log(`✅ File retrieved successfully`);
+  return result;
 };
 
 // Account Operations
-export const getBalance = async (accountId?: string): Promise<string> => {
-  const sdk = getNovaSDK();
+export const getBalance = async (accountId?: string, nearWallet?: string): Promise<string> => {
+  const sdk = getNovaSDK(nearWallet);
   return await sdk.getBalance(accountId);
 };
 
-export const getTransactionsForGroup = async (groupId: string): Promise<any[]> => {
-  const sdk = getNovaSDK();
+export const getTransactionsForGroup = async (groupId: string, nearWallet?: string): Promise<any[]> => {
+  const sdk = getNovaSDK(nearWallet);
   return await sdk.getTransactionsForGroup(groupId);
 };
 
-export const estimateFee = async (action: string): Promise<string> => {
-  const sdk = getNovaSDK();
+export const estimateFee = async (action: string, nearWallet?: string): Promise<string> => {
+  const sdk = getNovaSDK(nearWallet);
   const fee = await sdk.estimateFee(action);
   return String(fee);
 };
 
-export const authStatus = async (groupId?: string): Promise<any> => {
-  const sdk = getNovaSDK();
+export const authStatus = async (groupId?: string, nearWallet?: string): Promise<any> => {
+  const sdk = getNovaSDK(nearWallet);
   return await sdk.authStatus(groupId);
 };
 
-export const getNetworkInfo = () => {
-  const sdk = getNovaSDK();
+export const getNetworkInfo = (nearWallet?: string) => {
+  const sdk = getNovaSDK(nearWallet);
   return sdk.getNetworkInfo();
 };
 
 // Utility
-export const computeHash = async (data: Buffer | Uint8Array): Promise<string> => {
-  const sdk = getNovaSDK();
+export const computeHash = async (data: Buffer | Uint8Array, nearWallet?: string): Promise<string> => {
+  const sdk = getNovaSDK(nearWallet);
   const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
   const result = await sdk.computeHashAsync(buffer);
   return String(result);

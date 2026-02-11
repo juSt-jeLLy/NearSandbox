@@ -43,16 +43,19 @@ const Profile = () => {
   // Download state
   const [downloadingProductId, setDownloadingProductId] = useState<number | null>(null);
 
-  useEffect(() => {
-    setIsConfigured(isNovaConfigured());
-    if (isNovaConfigured()) {
+
+useEffect(() => {
+  if (signedAccountId) {  
+    setIsConfigured(isNovaConfigured(signedAccountId)); 
+    if (isNovaConfigured(signedAccountId)) {
       try {
-        setNetworkInfo(getNetworkInfo());
+        setNetworkInfo(getNetworkInfo(signedAccountId));  
       } catch (e) {
         console.error('Failed to get network info:', e);
       }
     }
-  }, []);
+  }
+}, [signedAccountId]);
 
   // Fetch marketplace stats when user connects wallet
   useEffect(() => {
@@ -128,12 +131,13 @@ const Profile = () => {
     setDownloadingProductId(item.product_id);
     
     try {
-      await retrieveAndDownloadFile(
-        item.nova_group_id,
-        item.cid,
-        item.product_id,
-        item.list_type
-      );
+await retrieveAndDownloadFile(
+  item.nova_group_id,
+  item.cid,
+  item.product_id,
+  item.list_type,
+  signedAccountId  // CRITICAL: Pass buyer's wallet
+);
     } catch (error) {
       // Error handling is done in retrieveAndDownloadFile
       console.error('Download failed:', error);
@@ -163,16 +167,16 @@ const Profile = () => {
     try {
       toast.info(`Granting access to ${listing.pendingBuyers} buyer(s)...`);
       
-      const result = await grantAccessToAllPendingBuyers(
-        listing.product_id,
-        listing.nova_group_id,
-        viewFunction,
-        callFunction,
-        (current, total, buyer) => {
-          toast.info(`Processing ${current}/${total}: ${buyer}`);
-        }
-      );
-      
+const result = await grantAccessToAllPendingBuyers(
+  listing.product_id,
+  listing.nova_group_id,
+  viewFunction,
+  callFunction,
+  signedAccountId!,  // CRITICAL: Pass owner's wallet (add ! since we know it exists here)
+  (current, total, buyer) => {
+    toast.info(`Processing ${current}/${total}: ${buyer}`);
+  }
+);
       if (result.success.length > 0) {
         toast.success(`✅ Granted access to ${result.success.length} buyer(s)`);
       }
@@ -300,48 +304,6 @@ const Profile = () => {
               Manage your NOVA account and view activity
             </p>
           </motion.div>
-
-          {/* Configuration Status */}
-          {!isConfigured && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-8"
-            >
-              <GlowCard glowOnHover={false}>
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-lg bg-destructive/10">
-                    <AlertCircle className="h-6 w-6 text-destructive" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-lg mb-2">NOVA Not Configured</h3>
-                    <p className="text-muted-foreground mb-4">
-                      To use NOVA features, please set the following environment variables:
-                    </p>
-                    <div className="space-y-2 font-mono text-sm">
-                      <div className="p-2 rounded bg-secondary">
-                        VITE_NOVA_ACCOUNT_ID=yourname.nova-sdk.near
-                      </div>
-                      <div className="p-2 rounded bg-secondary">
-                        VITE_NOVA_API_KEY=nova_sk_xxxxxxxxxxxxx
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-4">
-                      Get your API key at{' '}
-                      <a
-                        href="https://nova-sdk.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        nova-sdk.com
-                      </a>
-                    </p>
-                  </div>
-                </div>
-              </GlowCard>
-            </motion.div>
-          )}
 
           {/* Marketplace Statistics */}
           {signedAccountId && (
