@@ -22,12 +22,18 @@ export default async function handler(req, res) {
   
   // Forward the request
   try {
+    // Build headers - forward all headers except host
+    const headers = {};
+    for (const [key, value] of Object.entries(req.headers)) {
+      // Skip host header, keep everything else
+      if (key.toLowerCase() !== 'host') {
+        headers[key] = value;
+      }
+    }
+    
     const fetchOptions = {
       method: req.method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': req.headers.authorization || '',
-      },
+      headers: headers,
     };
 
     // Add body for POST/PUT/PATCH requests
