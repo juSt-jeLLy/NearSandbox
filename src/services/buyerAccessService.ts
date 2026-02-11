@@ -1,6 +1,6 @@
 import { addGroupMember, revokeGroupMember } from './novaService';
 
-const MARKETPLACE_CONTRACT = 'marketplace-1770849736.testnet';
+const MARKETPLACE_CONTRACT = 'marketplace-1770852588.testnet';
 
 export interface BuyerAccessStatus {
   buyer: string;
@@ -244,7 +244,7 @@ export const getBuyerAccessStatus = async (
 
 /**
  * Batch grant access to all pending buyers
- * IMPROVED: First gets all pending buyers with NOVA accounts, then processes them
+ * Fetches NOVA account IDs from contract for each buyer
  */
 export const grantAccessToAllPendingBuyers = async (
   productId: number,
@@ -254,192 +254,39 @@ export const grantAccessToAllPendingBuyers = async (
   ownerWallet: string,
   onProgress?: (current: number, total: number, buyer: string) => void
 ): Promise<{ success: string[]; failed: string[] }> => {
-  try {
-    // STEP 1: Get all pending buyers with their NOVA account IDs from contract
-    console.log('\n' + '='.repeat(80));
-    console.log(`📋 FETCHING PENDING BUYERS FOR PRODUCT #${productId}`);
-    console.log('='.repeat(80));
-    
-    const pendingBuyersWithNova = await viewFunction({
-      contractId: MARKETPLACE_CONTRACT,
-      method: 'get_pending_buyers_with_nova_accounts',
-      args: { p_id: productId },
-    });
-    
-    if (!pendingBuyersWithNova || pendingBuyersWithNova.length === 0) {
-      console.log('No pending buyers found');
-      return { success: [], failed: [] };
-    }
-    
-    // STEP 2: Display all buyers and their NOVA accounts
-    console.log(`Total pending buyers: ${pendingBuyersWithNova.length}\n`);
-    
-    pendingBuyersWithNova.forEach((item: [string, string], index: number) => {
-      const [nearWallet, novaAccountId] = item;
-      console.log(`${index + 1}. NEAR Wallet: ${nearWallet}`);
-      console.log(`   NOVA Account: ${novaAccountId}`);
-      console.log('');
-    });
-    console.log('='.repeat(80) + '\n');
-    
-    const success: string[] = [];
-    const failed: string[] = [];
-    
-    // STEP 3: Process each buyer - Add to NOVA group, then update contract
-    for (let i = 0; i < pendingBuyersWithNova.length; i++) {
-      const [nearWallet, novaAccountId] = pendingBuyersWithNova[i];
-      onProgress?.(i + 1, pendingBuyersWithNova.length, nearWallet);
-      
-      console.log(`\n🔄 Processing buyer ${i + 1}/${pendingBuyersWithNova.length}:`);
-      console.log(`   NEAR Wallet: ${nearWallet}`);
-      console.log(`   NOVA Account: ${novaAccountId}`);
-      
-      try {
-        // Sub-step 1: Add NOVA account to NOVA group
-        console.log(`   → Adding ${novaAccountId} to NOVA group ${novaGroupId}...`);
-        await addGroupMember(novaGroupId, novaAccountId, ownerWallet);
-        console.log(`   ✅ Added to NOVA group`);
-        
-        // Sub-step 2: Update contract with NEAR wallet
-        console.log(`   → Updating contract for ${nearWallet}...`);
-        await callFunction({
-          contractId: MARKETPLACE_CONTRACT,
-          method: 'grant_buyer_access',
-          args: {
-            p_id: productId,
-            buyer: nearWallet,  // Use NEAR wallet for contract
-          },
-        });
-        console.log(`   ✅ Contract updated`);
-        console.log(`   ✅ SUCCESS: ${nearWallet} now has full access`);
-        
-        success.push(nearWallet);
-      } catch (error: any) {
-        console.error(`   ❌ FAILED for ${nearWallet}:`, error);
-        failed.push(nearWallet);
-      }
-    }
-    
-    // STEP 4: Summary
-    console.log('\n' + '='.repeat(80));
-    console.log('📊 GRANT ACCESS SUMMARY');
-    console.log('='.repeat(80));
-    console.log(`✅ Successfully granted access: ${success.length}/${pendingBuyersWithNova.length}`);
-    console.log(`❌ Failed: ${failed.length}/${pendingBuyersWithNova.length}`);
-    if (success.length > 0) {
-      console.log(`\n✅ Success list:`);
-      success.forEach((wallet, idx) => console.log(`   ${idx + 1}. ${wallet}`));
-    }
-    if (failed.length > 0) {
-      console.log(`\n❌ Failed list:`);
-      failed.forEach((wallet, idx) => console.log(`   ${idx + 1}. ${wallet}`));
-    }
-    console.log('='.repeat(80) + '\n');
-    
-    return { success, failed };
-  } catch (error: any) {
-    console.error('Failed to grant access to pending buyers:', error);
-    throw new Error(`Batch grant access failed: ${error.message}`);
+  // Get pending buyers (just NEAR wallets)
+  const pendingBuyers = await getPendingAccessBuyers(productId, viewFunction);
+  
+  if (pendingBuyers.length === 0) {
+    console.log('No pending buyers found');
+    return { success: [], failed: [] };
   }
-};
-
-/**
- * NEW: Test function - Grant contract access only (NO NOVA group access)
- * This is for testing the contract flow without actually granting decryption access
- */
-export const testGrantAccessToAllPendingBuyers = async (
-  productId: number,
-  viewFunction: any,
-  callFunction: any,
-  onProgress?: (current: number, total: number, buyer: string) => void
-): Promise<{ success: string[]; failed: string[] }> => {
-  try {
-    // STEP 1: Get all pending buyers with their NOVA account IDs from contract
-    console.log('\n' + '='.repeat(80));
-    console.log(`🧪 TEST MODE: FETCHING PENDING BUYERS FOR PRODUCT #${productId}`);
-    console.log('='.repeat(80));
+  
+  console.log(`Found ${pendingBuyers.length} pending buyers:`, pendingBuyers);
+  
+  const success: string[] = [];
+  const failed: string[] = [];
+  
+  for (let i = 0; i < pendingBuyers.length; i++) {
+    const buyerNearWallet = pendingBuyers[i];
+    onProgress?.(i + 1, pendingBuyers.length, buyerNearWallet);
     
-    const pendingBuyersWithNova = await viewFunction({
-      contractId: MARKETPLACE_CONTRACT,
-      method: 'get_pending_buyers_with_nova_accounts',
-      args: { p_id: productId },
-    });
-    
-    if (!pendingBuyersWithNova || pendingBuyersWithNova.length === 0) {
-      console.log('No pending buyers found');
-      return { success: [], failed: [] };
+    try {
+      // grantBuyerAccess will fetch the NOVA account ID from contract internally
+      await grantBuyerAccess(
+        productId,
+        novaGroupId,
+        buyerNearWallet,
+        viewFunction,  // Pass viewFunction so it can fetch NOVA account ID
+        callFunction,
+        ownerWallet
+      );
+      success.push(buyerNearWallet);
+    } catch (error) {
+      console.error(`Failed to grant access to ${buyerNearWallet}:`, error);
+      failed.push(buyerNearWallet);
     }
-    
-    // STEP 2: Display all buyers and their NOVA accounts
-    console.log(`Total pending buyers: ${pendingBuyersWithNova.length}\n`);
-    
-    pendingBuyersWithNova.forEach((item: [string, string], index: number) => {
-      const [nearWallet, novaAccountId] = item;
-      console.log(`${index + 1}. NEAR Wallet: ${nearWallet}`);
-      console.log(`   NOVA Account: ${novaAccountId}`);
-      console.log('');
-    });
-    console.log('='.repeat(80) + '\n');
-    
-    const success: string[] = [];
-    const failed: string[] = [];
-    
-    // STEP 3: Grant contract access only (NO NOVA)
-    console.log('🧪 TEST MODE: Updating contract only (NO NOVA group access)\n');
-    
-    for (let i = 0; i < pendingBuyersWithNova.length; i++) {
-      const [nearWallet, novaAccountId] = pendingBuyersWithNova[i];
-      onProgress?.(i + 1, pendingBuyersWithNova.length, nearWallet);
-      
-      console.log(`\n🔄 Processing buyer ${i + 1}/${pendingBuyersWithNova.length}:`);
-      console.log(`   NEAR Wallet: ${nearWallet}`);
-      console.log(`   NOVA Account: ${novaAccountId} (NOT adding to NOVA group)`);
-      
-      try {
-        // Update contract only (NO NOVA GROUP UPDATE)
-        console.log(`   → Updating contract for ${nearWallet}...`);
-        await callFunction({
-          contractId: MARKETPLACE_CONTRACT,
-          method: 'grant_buyer_access',
-          args: {
-            p_id: productId,
-            buyer: nearWallet,  // NEAR wallet address
-          },
-        });
-        console.log(`   ✅ Contract updated (buyer still CANNOT decrypt)`);
-        
-        success.push(nearWallet);
-      } catch (error: any) {
-        console.error(`   ❌ Failed to update contract:`, error);
-        failed.push(nearWallet);
-      }
-    }
-    
-    // STEP 4: Summary
-    console.log('\n' + '='.repeat(80));
-    console.log('📊 TEST SUMMARY');
-    console.log('='.repeat(80));
-    console.log(`Contract updated: ${success.length}/${pendingBuyersWithNova.length}`);
-    console.log(`Failed: ${failed.length}/${pendingBuyersWithNova.length}`);
-    console.log(`NOVA accounts found: ${pendingBuyersWithNova.length}/${pendingBuyersWithNova.length}`);
-    console.log('='.repeat(80));
-    console.log('⚠️  NOTE: This is CONTRACT ONLY - buyers still CANNOT decrypt files');
-    console.log('    (No NOVA group access was granted)');
-    console.log('='.repeat(80) + '\n');
-    
-    if (success.length > 0) {
-      console.log(`\n✅ Contract updated for:`);
-      success.forEach((wallet, idx) => console.log(`   ${idx + 1}. ${wallet}`));
-    }
-    if (failed.length > 0) {
-      console.log(`\n❌ Failed for:`);
-      failed.forEach((wallet, idx) => console.log(`   ${idx + 1}. ${wallet}`));
-    }
-    console.log('');
-    
-    return { success, failed };
-  } catch (error: any) {
-    console.error('Test grant access failed:', error);
-    throw new Error(`Test failed: ${error.message}`);
   }
+  
+  return { success, failed };
 };

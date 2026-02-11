@@ -14,13 +14,12 @@ import {
 } from '@/services/profileService';
 import { 
   grantAccessToAllPendingBuyers,
-  testGrantAccessToAllPendingBuyers,
   getPendingAccessBuyers 
 } from '@/services/buyerAccessService';
 import { useNearWallet } from 'near-connect-hooks';
 import { toast } from 'sonner';
 
-const MARKETPLACE_CONTRACT = 'marketplace-1770849736.testnet';
+const MARKETPLACE_CONTRACT = 'marketplace-1770852588.testnet';
 
 const Profile = () => {
   const { viewFunction, signedAccountId, callFunction } = useNearWallet();
@@ -33,14 +32,19 @@ const Profile = () => {
   const [groupIdInput, setGroupIdInput] = useState('');
   const [transactions, setTransactions] = useState<any[]>([]);
   
+  // Marketplace stats with access info
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [createdListings, setCreatedListings] = useState<ListingWithAccessInfo[]>([]);
   const [purchasedItems, setPurchasedItems] = useState<PurchasedItemWithAccessInfo[]>([]);
   const [loadingStats, setLoadingStats] = useState(false);
   
+  // Grant access state
   const [grantingAccessProductId, setGrantingAccessProductId] = useState<number | null>(null);
   const [testingAccessProductId, setTestingAccessProductId] = useState<number | null>(null);
+  
+  // Download state
   const [downloadingProductId, setDownloadingProductId] = useState<number | null>(null);
+
 
   useEffect(() => {
     if (signedAccountId) {  
@@ -55,6 +59,7 @@ const Profile = () => {
     }
   }, [signedAccountId]);
 
+  // Fetch marketplace stats when user connects wallet
   useEffect(() => {
     if (signedAccountId && viewFunction) {
       fetchMarketplaceStats();
@@ -86,6 +91,7 @@ const Profile = () => {
     
     setLoadingStats(true);
     try {
+      // Use the comprehensive profile data function
       const profileData = await getUserProfileData(viewFunction, signedAccountId);
       
       setUserStats(profileData.stats);
@@ -132,9 +138,10 @@ const Profile = () => {
         item.cid,
         item.product_id,
         item.list_type,
-        signedAccountId
+        signedAccountId  // CRITICAL: Pass buyer's wallet
       );
     } catch (error) {
+      // Error handling is done in retrieveAndDownloadFile
       console.error('Download failed:', error);
     } finally {
       setDownloadingProductId(null);
@@ -162,12 +169,13 @@ const Profile = () => {
     try {
       toast.info(`Granting access to ${listing.pendingBuyers} buyer(s)...`);
       
+      // UPDATED: Pass viewFunction so it can fetch NOVA account IDs from contract
       const result = await grantAccessToAllPendingBuyers(
         listing.product_id,
         listing.nova_group_id,
-        viewFunction,
+        viewFunction,  // Needed to fetch NOVA account IDs from contract
         callFunction,
-        signedAccountId!,
+        signedAccountId!,  // Owner's wallet for NOVA SDK
         (current, total, buyer) => {
           toast.info(`Processing ${current}/${total}: ${buyer}`);
         }
@@ -181,6 +189,7 @@ const Profile = () => {
         toast.error(`❌ Failed to grant access to ${result.failed.length} buyer(s)`);
       }
       
+      // Refresh listings to show updated status
       await fetchMarketplaceStats();
       
     } catch (error: any) {
@@ -205,26 +214,91 @@ const Profile = () => {
     setTestingAccessProductId(listing.product_id);
     
     try {
-      toast.info('Starting test mode (contract only, no NOVA)...');
+      // STEP 1: Get all pending buyers with their NOVA account IDs from contract
+      toast.info('Fetching pending buyers with NOVA accounts...');
       
-      const result = await testGrantAccessToAllPendingBuyers(
-        listing.product_id,
-        viewFunction,
-        callFunction,
-        (current, total, buyer) => {
-          toast.info(`Processing ${current}/${total}: ${buyer}`);
+      const pendingBuyersWithNova = await viewFunction({
+        contractId: MARKETPLACE_CONTRACT,
+        method: 'get_pending_buyers_with_nova_accounts',
+        args: { p_id: listing.product_id },
+      });
+      
+      if (!pendingBuyersWithNova || pendingBuyersWithNova.length === 0) {
+        toast.info('No pending buyers found');
+        console.log('No pending buyers with NOVA accounts found');
+        return;
+      }
+      
+      // STEP 2: Display all buyers and their NOVA accounts in console
+      console.log('\n' + '='.repeat(80));
+      console.log(`📋 PENDING BUYERS FOR PRODUCT #${listing.product_id}`);
+      console.log('='.repeat(80));
+      console.log(`Total pending buyers: ${pendingBuyersWithNova.length}\n`);
+      
+      pendingBuyersWithNova.forEach((item: [string, string], index: number) => {
+        const [nearWallet, novaAccountId] = item;
+        console.log(`${index + 1}. NEAR Wallet: ${nearWallet}`);
+        console.log(`   NOVA Account: ${novaAccountId}`);
+        console.log('');
+      });
+      
+      console.log('='.repeat(80) + '\n');
+      
+      // STEP 3: Grant access in contract only (NO NOVA)
+      toast.info(`Granting contract access to ${pendingBuyersWithNova.length} buyer(s)...`);
+      
+      let successCount = 0;
+      let failCount = 0;
+      
+      for (let i = 0; i < pendingBuyersWithNova.length; i++) {
+        const [nearWallet, novaAccountId] = pendingBuyersWithNova[i];
+        toast.info(`Processing ${i + 1}/${pendingBuyersWithNova.length}: ${nearWallet}`);
+        
+        console.log(`\nProcessing buyer ${i + 1}/${pendingBuyersWithNova.length}:`);
+        console.log(`  NEAR Wallet: ${nearWallet}`);
+        console.log(`  NOVA Account: ${novaAccountId}`);
+        
+        try {
+          // Update contract only (NO NOVA GROUP UPDATE)
+          await callFunction({
+            contractId: MARKETPLACE_CONTRACT,
+            method: 'grant_buyer_access',
+            args: {
+              p_id: listing.product_id,
+              buyer: nearWallet,  // NEAR wallet address
+            },
+          });
+          successCount++;
+          console.log(`  ✅ Contract updated successfully`);
+        } catch (error: any) {
+          failCount++;
+          console.error(`  ❌ Failed to update contract:`, error);
+          toast.error(`Failed for ${nearWallet}: ${error.message}`);
         }
-      );
-      
-      if (result.success.length > 0) {
-        toast.success(`✅ Test complete: Updated contract for ${result.success.length} buyer(s)`);
-      }
-      if (result.failed.length > 0) {
-        toast.error(`❌ Failed to update contract for ${result.failed.length} buyer(s)`);
       }
       
-      toast.warning('⚠️ NOTE: This is CONTRACT ONLY - buyers still CANNOT decrypt files');
+      // STEP 4: Summary
+      console.log('\n' + '='.repeat(80));
+      console.log('📊 TEST SUMMARY');
+      console.log('='.repeat(80));
+      console.log(`Contract updated: ${successCount}/${pendingBuyersWithNova.length}`);
+      console.log(`Failed: ${failCount}/${pendingBuyersWithNova.length}`);
+      console.log(`NOVA accounts found: ${pendingBuyersWithNova.length}/${pendingBuyersWithNova.length}`);
+      console.log('='.repeat(80));
+      console.log('⚠️  NOTE: This is CONTRACT ONLY - buyers still CANNOT decrypt files');
+      console.log('    (No NOVA group access was granted)');
+      console.log('='.repeat(80) + '\n');
       
+      if (successCount > 0) {
+        toast.success(`✅ Test complete: Updated contract for ${successCount} buyer(s)`);
+      }
+      if (failCount > 0) {
+        toast.error(`❌ Failed to update contract for ${failCount} buyer(s)`);
+      }
+      
+      toast.warning('⚠️ NOTE: This is CONTRACT ONLY - buyers still CANNOT decrypt files (no NOVA group access)');
+      
+      // Refresh listings to show updated status
       await fetchMarketplaceStats();
       
     } catch (error: any) {
@@ -270,6 +344,7 @@ const Profile = () => {
     <PageTransition>
       <div className="px-4 py-12 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl">
+          {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -283,6 +358,7 @@ const Profile = () => {
             </p>
           </motion.div>
 
+          {/* Marketplace Statistics */}
           {signedAccountId && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -303,6 +379,7 @@ const Profile = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Listings Created */}
                 <GlowCard>
                   <div className="flex items-center justify-between">
                     <div>
@@ -317,6 +394,7 @@ const Profile = () => {
                   </div>
                 </GlowCard>
 
+                {/* Items Purchased */}
                 <GlowCard>
                   <div className="flex items-center justify-between">
                     <div>
@@ -331,6 +409,7 @@ const Profile = () => {
                   </div>
                 </GlowCard>
 
+                {/* Total Spent */}
                 <GlowCard>
                   <div className="flex items-center justify-between">
                     <div>
@@ -348,6 +427,7 @@ const Profile = () => {
             </motion.div>
           )}
 
+          {/* Created Listings Summary with Access Info */}
           {signedAccountId && createdListings.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -388,6 +468,7 @@ const Profile = () => {
                         </div>
                       </div>
                       
+                      {/* Buyer Access Status */}
                       {listing.buyers.length > 0 && (
                         <div className="pt-2 border-t border-border/50">
                           <div className="flex items-center gap-4 text-sm mb-2">
@@ -407,8 +488,10 @@ const Profile = () => {
                             )}
                           </div>
                           
+                          {/* Action Buttons */}
                           {listing.pendingBuyers > 0 && (
                             <div className="flex gap-2 mt-2">
+                              {/* Grant Access Button - Full flow (NOVA + Contract) */}
                               <Button
                                 variant="default"
                                 size="sm"
@@ -429,6 +512,7 @@ const Profile = () => {
                                 )}
                               </Button>
                               
+                              {/* Test Button - Contract only (no NOVA) */}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -451,6 +535,7 @@ const Profile = () => {
                             </div>
                           )}
                           
+                          {/* Info messages */}
                           {!isConfigured && listing.pendingBuyers > 0 && (
                             <p className="text-xs text-yellow-500 mt-2">
                               ⚠️ Configure NOVA to grant real access
@@ -465,6 +550,7 @@ const Profile = () => {
             </motion.div>
           )}
 
+          {/* Purchased Items Summary with Access Status */}
           {signedAccountId && purchasedItems.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -502,6 +588,7 @@ const Profile = () => {
                         </div>
                       </div>
                       
+                      {/* Access Status and Actions */}
                       <div className="pt-2 border-t border-border/50 flex items-center justify-between gap-2">
                         {getAccessBadge(item.accessStatus)}
                         
@@ -516,6 +603,7 @@ const Profile = () => {
                             Copy CID
                           </Button>
                           
+                          {/* Download Button - Only show if access is granted */}
                           {item.accessStatus === 'granted' && (
                             <Button
                               variant="default"
@@ -540,6 +628,7 @@ const Profile = () => {
                         </div>
                       </div>
                       
+                      {/* Access Message */}
                       {item.accessStatus === 'pending' && (
                         <p className="text-xs text-yellow-500 mt-2">
                           ⏳ Waiting for owner to grant NOVA access
