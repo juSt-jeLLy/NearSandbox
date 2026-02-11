@@ -51,7 +51,8 @@ export const retrieveAndDownloadFile = async (
   novaGroupId: string,
   cid: string,
   productId: number,
-  listType: string
+  listType: string,
+  buyerWallet?: string  // CRITICAL: Added buyer's wallet parameter
 ): Promise<void> => {
   // Ensure we're in browser environment (required for download)
   if (typeof window === 'undefined') {
@@ -61,8 +62,8 @@ export const retrieveAndDownloadFile = async (
   try {
     toast.info('Retrieving file from NOVA...');
     
-    // Retrieve the encrypted file and decrypt it
-    const result = await retrieveFile(novaGroupId, cid);
+    // CRITICAL: Pass buyerWallet to retrieveFile so it uses the correct credentials
+    const result = await retrieveFile(novaGroupId, cid, buyerWallet);
     
     // Convert Buffer to Uint8Array for browser compatibility
     // This works because Buffer extends Uint8Array in Node.js
@@ -98,6 +99,8 @@ export const retrieveAndDownloadFile = async (
       toast.error('Access denied. You may not have been granted NOVA access yet.');
     } else if (error.message?.includes('not found')) {
       toast.error('File not found on IPFS. The CID may be invalid.');
+    } else if (error.message?.includes('wallet connected')) {
+      toast.error('Wallet not connected. Please connect your wallet and try again.');
     } else {
       toast.error(`Download failed: ${error.message || 'Unknown error'}`);
     }

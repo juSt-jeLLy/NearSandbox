@@ -128,12 +128,13 @@ const Profile = () => {
     setDownloadingProductId(item.product_id);
     
     try {
-      await retrieveAndDownloadFile(
-        item.nova_group_id,
-        item.cid,
-        item.product_id,
-        item.list_type
-      );
+await retrieveAndDownloadFile(
+  item.nova_group_id,
+  item.cid,
+  item.product_id,
+  item.list_type,
+  signedAccountId  // CRITICAL: Pass buyer's wallet
+);
     } catch (error) {
       // Error handling is done in retrieveAndDownloadFile
       console.error('Download failed:', error);
@@ -163,16 +164,16 @@ const Profile = () => {
     try {
       toast.info(`Granting access to ${listing.pendingBuyers} buyer(s)...`);
       
-      const result = await grantAccessToAllPendingBuyers(
-        listing.product_id,
-        listing.nova_group_id,
-        viewFunction,
-        callFunction,
-        (current, total, buyer) => {
-          toast.info(`Processing ${current}/${total}: ${buyer}`);
-        }
-      );
-      
+const result = await grantAccessToAllPendingBuyers(
+  listing.product_id,
+  listing.nova_group_id,
+  viewFunction,
+  callFunction,
+  signedAccountId!,  // CRITICAL: Pass owner's wallet (add ! since we know it exists here)
+  (current, total, buyer) => {
+    toast.info(`Processing ${current}/${total}: ${buyer}`);
+  }
+);
       if (result.success.length > 0) {
         toast.success(`✅ Granted access to ${result.success.length} buyer(s)`);
       }

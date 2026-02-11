@@ -75,7 +75,8 @@ export const uploadAndCreateListing = async (
       message: `Creating NOVA group: ${groupId}`
     });
     
-    await registerGroup(groupId);
+    // IMPORTANT: Pass ownerAccount (NEAR wallet) to registerGroup
+    await registerGroup(groupId, ownerAccount);
     console.log(`✅ Group registered: ${groupId}`);
     
     // Step 2: Upload file to NOVA
@@ -88,7 +89,8 @@ export const uploadAndCreateListing = async (
     const arrayBuffer = await file.arrayBuffer();
     const fileBuffer = Buffer.from(arrayBuffer);
     
-    const uploadResult = await uploadFile(groupId, fileBuffer, file.name);
+    // IMPORTANT: Pass ownerAccount (NEAR wallet) to uploadFile
+    const uploadResult = await uploadFile(groupId, fileBuffer, file.name, ownerAccount);
     console.log(`✅ File uploaded to NOVA. CID: ${uploadResult.cid}`);
     
     // Step 3: Create marketplace listing
@@ -145,6 +147,8 @@ export const uploadAndCreateListing = async (
       throw new Error('Insufficient NEAR balance. Please add funds to your NOVA account at nova-sdk.com');
     } else if (error.message?.includes('Session token')) {
       throw new Error('Session expired. Your API key may be invalid. Generate a new one at nova-sdk.com');
+    } else if (error.message?.includes('wallet connected')) {
+      throw new Error('NEAR wallet connection lost. Please reconnect your wallet.');
     }
     
     throw new Error(`Upload failed: ${error.message || 'Unknown error'}`);
