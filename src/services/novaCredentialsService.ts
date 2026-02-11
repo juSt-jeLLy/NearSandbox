@@ -18,24 +18,16 @@ const STORAGE_KEY = 'nova_credentials_encrypted';
 
 // Encryption key derived from browser fingerprint + salt
 const getEncryptionKey = (): string => {
-  // Create a deterministic key based on browser characteristics
-  // This is not super secure but provides basic obfuscation
   const fingerprint = `${navigator.userAgent}${navigator.language}${screen.width}x${screen.height}`;
-  const salt = 'nova-marketplace-v1'; // You can change this
+  const salt = 'nova-marketplace-v1';
   return CryptoJS.SHA256(fingerprint + salt).toString();
 };
 
-/**
- * Encrypt credentials
- */
 const encryptData = (data: string): string => {
   const key = getEncryptionKey();
   return CryptoJS.AES.encrypt(data, key).toString();
 };
 
-/**
- * Decrypt credentials
- */
 const decryptData = (encryptedData: string): string => {
   try {
     const key = getEncryptionKey();
@@ -48,17 +40,15 @@ const decryptData = (encryptedData: string): string => {
 };
 
 /**
- * Save NOVA credentials for a specific NEAR wallet
+ * Save NOVA credentials for a specific NEAR wallet.
+ * Also invalidates the SDK cache so the next call picks up fresh creds.
  */
 export const saveNovaCredentials = (
   nearWallet: string,
   credentials: NovaCredentials
 ): void => {
   try {
-    // Get existing data
     const allCredentials = getAllStoredCredentials();
-    
-    // Add/update credentials for this wallet
     const timestamp = Date.now();
     allCredentials[nearWallet] = {
       nearWallet,
@@ -66,11 +56,13 @@ export const saveNovaCredentials = (
       createdAt: allCredentials[nearWallet]?.createdAt || timestamp,
       updatedAt: timestamp,
     };
-    
-    // Encrypt and save
+
     const jsonData = JSON.stringify(allCredentials);
     const encrypted = encryptData(jsonData);
     localStorage.setItem(STORAGE_KEY, encrypted);
+
+    // Bust SDK cache so next getNovaSDK() call uses the new credentials
+    invalidateCache(nearWallet);
   } catch (error) {
     console.error('Failed to save NOVA credentials:', error);
     throw new Error('Failed to save credentials');
@@ -78,7 +70,7 @@ export const saveNovaCredentials = (
 };
 
 /**
- * Get NOVA credentials for a specific NEAR wallet
+ * Get NOVA credentials for a specific NEAR wallet.
  */
 export const getNovaCredentials = (nearWallet: string): NovaCredentials | null => {
   try {
@@ -91,16 +83,20 @@ export const getNovaCredentials = (nearWallet: string): NovaCredentials | null =
 };
 
 /**
- * Delete NOVA credentials for a specific NEAR wallet
+ * Delete NOVA credentials for a specific NEAR wallet.
+ * Also invalidates the SDK cache.
  */
 export const deleteNovaCredentials = (nearWallet: string): void => {
   try {
     const allCredentials = getAllStoredCredentials();
     delete allCredentials[nearWallet];
-    
+
     const jsonData = JSON.stringify(allCredentials);
     const encrypted = encryptData(jsonData);
     localStorage.setItem(STORAGE_KEY, encrypted);
+
+    // Bust SDK cache
+    invalidateCache(nearWallet);
   } catch (error) {
     console.error('Failed to delete NOVA credentials:', error);
     throw new Error('Failed to delete credentials');
@@ -108,7 +104,7 @@ export const deleteNovaCredentials = (nearWallet: string): void => {
 };
 
 /**
- * Check if NOVA credentials exist for a wallet
+ * Check if NOVA credentials exist for a wallet.
  */
 export const hasNovaCredentials = (nearWallet: string): boolean => {
   const credentials = getNovaCredentials(nearWallet);
@@ -116,16 +112,14 @@ export const hasNovaCredentials = (nearWallet: string): boolean => {
 };
 
 /**
- * Get all stored credentials (decrypted)
+ * Get all stored credentials (decrypted).
  */
 const getAllStoredCredentials = (): Record<string, StoredCredentials> => {
   try {
     const encrypted = localStorage.getItem(STORAGE_KEY);
     if (!encrypted) return {};
-    
     const decrypted = decryptData(encrypted);
     if (!decrypted) return {};
-    
     return JSON.parse(decrypted);
   } catch (error) {
     console.error('Failed to parse stored credentials:', error);
@@ -134,29 +128,31 @@ const getAllStoredCredentials = (): Record<string, StoredCredentials> => {
 };
 
 /**
- * Clear all stored credentials
+ * Clear all stored credentials.
  */
 export const clearAllCredentials = (): void => {
   localStorage.removeItem(STORAGE_KEY);
 };
 
 /**
- * Validate NOVA credentials format
+ * Validate NOVA credentials format.
  */
 export const validateNovaCredentials = (credentials: NovaCredentials): boolean => {
-  if (!credentials.accountId || !credentials.apiKey) {
-    return false;
-  }
-  
-  // Check account ID format (should end with .nova-sdk.near)
-  if (!credentials.accountId.includes('.nova-sdk.near')) {
-    return false;
-  }
-  
-  // Check API key format (should start with nova_sk_)
-  if (!credentials.apiKey.startsWith('nova_sk_')) {
-    return false;
-  }
-  
+  if (!credentials.accountId || !credentials.apiKey) return false;
+  if (!credentials.accountId.includes('.nova-sdk.near')) return false;
+  if (!credentials.apiKey.startsWith('nova_sk_')) return false;
   return true;
+};
+
+// ---------------------------------------------------------------------------
+// Internal helper: bust the SDK instance cache without a circular import.
+// We do a lazy dynamic import so novaCredentialsService doesn't hard-depend
+// on novaService at module load time.
+// ---------------------------------------------------------------------------
+const invalidateCache = (nearWallet: string): void => {
+  import('./novaService')
+    .then(({ invalidateNovaSDKCache }) => invalidateNovaSDKCache(nearWallet))
+    .catch(() => {
+      // novaService not loaded yet — nothing to invalidate
+    });
 };

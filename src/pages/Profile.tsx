@@ -301,48 +301,6 @@ const Profile = () => {
             </p>
           </motion.div>
 
-          {/* Configuration Status */}
-          {!isConfigured && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-8"
-            >
-              <GlowCard glowOnHover={false}>
-                <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-lg bg-destructive/10">
-                    <AlertCircle className="h-6 w-6 text-destructive" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-lg mb-2">NOVA Not Configured</h3>
-                    <p className="text-muted-foreground mb-4">
-                      To use NOVA features, please set the following environment variables:
-                    </p>
-                    <div className="space-y-2 font-mono text-sm">
-                      <div className="p-2 rounded bg-secondary">
-                        VITE_NOVA_ACCOUNT_ID=yourname.nova-sdk.near
-                      </div>
-                      <div className="p-2 rounded bg-secondary">
-                        VITE_NOVA_API_KEY=nova_sk_xxxxxxxxxxxxx
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-4">
-                      Get your API key at{' '}
-                      <a
-                        href="https://nova-sdk.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline"
-                      >
-                        nova-sdk.com
-                      </a>
-                    </p>
-                  </div>
-                </div>
-              </GlowCard>
-            </motion.div>
-          )}
-
           {/* Marketplace Statistics */}
           {signedAccountId && (
             <motion.div
