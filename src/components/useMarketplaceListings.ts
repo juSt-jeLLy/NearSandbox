@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNearWallet } from 'near-connect-hooks';
 import { toast } from 'sonner';
 
-const MARKETPLACE_CONTRACT = 'marketplace-1770828146.testnet';
+const MARKETPLACE_CONTRACT = 'vitalhare6068.near';
 
 const THIRTY_TGAS = '30000000000000';
 const NO_DEPOSIT = '0';

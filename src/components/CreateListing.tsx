@@ -9,7 +9,7 @@ import GlowCard from '@/components/GlowCard';
 import { useNearWallet } from 'near-connect-hooks';
 import { toast } from 'sonner';
 
-const MARKETPLACE_CONTRACT = 'marketplace-1770828146.testnet';
+const MARKETPLACE_CONTRACT = 'vitalhare6068.near';
 
 interface CreateListingProps {
   uploadedCid?: string;
