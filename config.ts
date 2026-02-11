@@ -17,6 +17,14 @@ const contractPerNetwork: ContractPerNetwork = {
   testnet: 'hello.near-examples.testnet',
 };
 
+// NEAR Contract Configuration
+export const MARKETPLACE_CONTRACT = '177a0e-718040-1770099193.nearplay.testnet';
+
+
+
+// Network configuration
+export const NETWORK_ID = 'testnet';
+
 // Chains for EVM Wallets
 const evmWalletChains: Record<'mainnet' | 'testnet', EVMWalletChain> = {
   mainnet: {

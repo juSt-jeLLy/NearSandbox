@@ -2,7 +2,7 @@ import { getPendingAccessBuyers, getBuyersWithAccess, checkBuyerAccess } from '.
 import { retrieveFile } from './novaService';
 import { toast } from 'sonner';
 
-const MARKETPLACE_CONTRACT = 'marketplace-1770558741.testnet';
+const MARKETPLACE_CONTRACT = 'marketplace-1770828146.testnet';
 
 export interface UserStats {
   listingsCreated: number;

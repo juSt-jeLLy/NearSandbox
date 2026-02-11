@@ -1,7 +1,7 @@
 import { addGroupMember, revokeGroupMember } from './novaService';
 import { useNearWallet } from 'near-connect-hooks';
 
-const MARKETPLACE_CONTRACT = 'marketplace-1770558741.testnet';
+const MARKETPLACE_CONTRACT = 'marketplace-1770828146.testnet';
 
 export interface BuyerAccessStatus {
   buyer: string;
