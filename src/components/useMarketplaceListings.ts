@@ -3,7 +3,7 @@ import { useNearWallet } from 'near-connect-hooks';
 import { toast } from 'sonner';
 import { getNovaCredentials } from '@/services/novaCredentialsService';
 
-const MARKETPLACE_CONTRACT = 'marketplace-1770852588.testnet';
+const MARKETPLACE_CONTRACT = 'busyward7488.near';
 
 const THIRTY_TGAS = '30000000000000';
 const NO_DEPOSIT = '0';

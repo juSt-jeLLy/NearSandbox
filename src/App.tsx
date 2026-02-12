@@ -22,9 +22,9 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <NearProvider 
       config={{
-        network: "testnet",
+        network: "mainnet",
         providers: {
-          testnet: ["https://rpc.testnet.near.org"]
+          testnet: ["https://rpc.mainnet.near.org"]
         }
       }}
     >

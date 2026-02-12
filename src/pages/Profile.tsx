@@ -14,12 +14,10 @@ import {
 } from '@/services/profileService';
 import { 
   grantAccessToAllPendingBuyers,
-  getPendingAccessBuyers 
+  testGrantAccessContractOnly
 } from '@/services/buyerAccessService';
 import { useNearWallet } from 'near-connect-hooks';
 import { toast } from 'sonner';
-
-const MARKETPLACE_CONTRACT = 'marketplace-1770852588.testnet';
 
 const Profile = () => {
   const { viewFunction, signedAccountId, callFunction } = useNearWallet();
@@ -138,10 +136,9 @@ const Profile = () => {
         item.cid,
         item.product_id,
         item.list_type,
-        signedAccountId  // CRITICAL: Pass buyer's wallet
+        signedAccountId
       );
     } catch (error) {
-      // Error handling is done in retrieveAndDownloadFile
       console.error('Download failed:', error);
     } finally {
       setDownloadingProductId(null);
@@ -169,15 +166,15 @@ const Profile = () => {
     try {
       toast.info(`Granting access to ${listing.pendingBuyers} buyer(s)...`);
       
-      // UPDATED: Pass viewFunction so it can fetch NOVA account IDs from contract
+      // Use the service function for full grant access (NOVA + Contract)
       const result = await grantAccessToAllPendingBuyers(
         listing.product_id,
         listing.nova_group_id,
-        viewFunction,  // Needed to fetch NOVA account IDs from contract
+        viewFunction,
         callFunction,
-        signedAccountId!,  // Owner's wallet for NOVA SDK
-        (current, total, buyer) => {
-          toast.info(`Processing ${current}/${total}: ${buyer}`);
+        signedAccountId!,
+        (current, total, nearWallet, novaId) => {
+          toast.info(`Processing ${current}/${total}: ${nearWallet}`);
         }
       );
       
@@ -187,6 +184,7 @@ const Profile = () => {
       
       if (result.failed.length > 0) {
         toast.error(`❌ Failed to grant access to ${result.failed.length} buyer(s)`);
+        console.error('Failed buyers:', result.failed);
       }
       
       // Refresh listings to show updated status
@@ -214,86 +212,49 @@ const Profile = () => {
     setTestingAccessProductId(listing.product_id);
     
     try {
-      // STEP 1: Get all pending buyers with their NOVA account IDs from contract
       toast.info('Fetching pending buyers with NOVA accounts...');
       
-      const pendingBuyersWithNova = await viewFunction({
-        contractId: MARKETPLACE_CONTRACT,
-        method: 'get_pending_buyers_with_nova_accounts',
-        args: { p_id: listing.product_id },
-      });
+      // Use the service function for test grant access
+      const result = await testGrantAccessContractOnly(
+        listing.product_id,
+        viewFunction,
+        callFunction,
+        (current, total, nearWallet, novaId) => {
+          toast.info(`Processing ${current}/${total}: ${nearWallet}`);
+        }
+      );
       
-      if (!pendingBuyersWithNova || pendingBuyersWithNova.length === 0) {
-        toast.info('No pending buyers found');
-        console.log('No pending buyers with NOVA accounts found');
-        return;
-      }
-      
-      // STEP 2: Display all buyers and their NOVA accounts in console
+      // Display all buyers and their NOVA accounts in console
       console.log('\n' + '='.repeat(80));
       console.log(`📋 PENDING BUYERS FOR PRODUCT #${listing.product_id}`);
       console.log('='.repeat(80));
-      console.log(`Total pending buyers: ${pendingBuyersWithNova.length}\n`);
+      console.log(`Total pending buyers: ${result.buyersWithNovaAccounts.length}\n`);
       
-      pendingBuyersWithNova.forEach((item: [string, string], index: number) => {
-        const [nearWallet, novaAccountId] = item;
-        console.log(`${index + 1}. NEAR Wallet: ${nearWallet}`);
-        console.log(`   NOVA Account: ${novaAccountId}`);
+      result.buyersWithNovaAccounts.forEach((buyer, index) => {
+        console.log(`${index + 1}. NEAR Wallet: ${buyer.nearWallet}`);
+        console.log(`   NOVA Account: ${buyer.novaAccountId}`);
         console.log('');
       });
       
       console.log('='.repeat(80) + '\n');
       
-      // STEP 3: Grant access in contract only (NO NOVA)
-      toast.info(`Granting contract access to ${pendingBuyersWithNova.length} buyer(s)...`);
-      
-      let successCount = 0;
-      let failCount = 0;
-      
-      for (let i = 0; i < pendingBuyersWithNova.length; i++) {
-        const [nearWallet, novaAccountId] = pendingBuyersWithNova[i];
-        toast.info(`Processing ${i + 1}/${pendingBuyersWithNova.length}: ${nearWallet}`);
-        
-        console.log(`\nProcessing buyer ${i + 1}/${pendingBuyersWithNova.length}:`);
-        console.log(`  NEAR Wallet: ${nearWallet}`);
-        console.log(`  NOVA Account: ${novaAccountId}`);
-        
-        try {
-          // Update contract only (NO NOVA GROUP UPDATE)
-          await callFunction({
-            contractId: MARKETPLACE_CONTRACT,
-            method: 'grant_buyer_access',
-            args: {
-              p_id: listing.product_id,
-              buyer: nearWallet,  // NEAR wallet address
-            },
-          });
-          successCount++;
-          console.log(`  ✅ Contract updated successfully`);
-        } catch (error: any) {
-          failCount++;
-          console.error(`  ❌ Failed to update contract:`, error);
-          toast.error(`Failed for ${nearWallet}: ${error.message}`);
-        }
-      }
-      
-      // STEP 4: Summary
+      // Summary
       console.log('\n' + '='.repeat(80));
       console.log('📊 TEST SUMMARY');
       console.log('='.repeat(80));
-      console.log(`Contract updated: ${successCount}/${pendingBuyersWithNova.length}`);
-      console.log(`Failed: ${failCount}/${pendingBuyersWithNova.length}`);
-      console.log(`NOVA accounts found: ${pendingBuyersWithNova.length}/${pendingBuyersWithNova.length}`);
+      console.log(`Contract updated: ${result.success.length}/${result.buyersWithNovaAccounts.length}`);
+      console.log(`Failed: ${result.failed.length}/${result.buyersWithNovaAccounts.length}`);
+      console.log(`NOVA accounts found: ${result.buyersWithNovaAccounts.length}/${result.buyersWithNovaAccounts.length}`);
       console.log('='.repeat(80));
       console.log('⚠️  NOTE: This is CONTRACT ONLY - buyers still CANNOT decrypt files');
       console.log('    (No NOVA group access was granted)');
       console.log('='.repeat(80) + '\n');
       
-      if (successCount > 0) {
-        toast.success(`✅ Test complete: Updated contract for ${successCount} buyer(s)`);
+      if (result.success.length > 0) {
+        toast.success(`✅ Test complete: Updated contract for ${result.success.length} buyer(s)`);
       }
-      if (failCount > 0) {
-        toast.error(`❌ Failed to update contract for ${failCount} buyer(s)`);
+      if (result.failed.length > 0) {
+        toast.error(`❌ Failed to update contract for ${result.failed.length} buyer(s)`);
       }
       
       toast.warning('⚠️ NOTE: This is CONTRACT ONLY - buyers still CANNOT decrypt files (no NOVA group access)');
