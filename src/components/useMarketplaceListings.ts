@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNearWallet } from 'near-connect-hooks';
 import { toast } from 'sonner';
+import { getNovaCredentials } from '@/services/novaCredentialsService';
 
-const MARKETPLACE_CONTRACT = 'vitalhare6068.near';
+const MARKETPLACE_CONTRACT = 'busyward7488.near';
 
 const THIRTY_TGAS = '30000000000000';
 const NO_DEPOSIT = '0';
@@ -59,13 +60,22 @@ export const useMarketplaceListings = () => {
       return;
     }
 
+    // CRITICAL: Get buyer's NOVA account ID from stored credentials
+    const novaCredentials = getNovaCredentials(signedAccountId);
+    if (!novaCredentials) {
+      toast.error('Please set up your NOVA account first. Click "Setup NOVA" in the navbar.');
+      return;
+    }
+
     console.log('Buy clicked for listing:', listing);
+    console.log('Buyer NEAR wallet:', signedAccountId);
+    console.log('Buyer NOVA account:', novaCredentials.accountId);
+    
     setBuyingListingId(listing.product_id);
     
     try {
       // Execute the buy transaction
-      // The contract's buy function will automatically use the connected wallet
-      // address (predecessor_account_id) as the buyer
+      // NOW PASSING: nova_account_id so the contract can map NEAR wallet → NOVA account
       const res = await signAndSendTransaction({
         receiverId: MARKETPLACE_CONTRACT,
         actions: [
@@ -73,7 +83,10 @@ export const useMarketplaceListings = () => {
             type: 'FunctionCall',
             params: {
               methodName: 'buy',
-              args: { p_id: listing.product_id },
+              args: { 
+                p_id: listing.product_id,
+                nova_account_id: novaCredentials.accountId  // NEW: Pass NOVA account ID
+              },
               gas: THIRTY_TGAS,
               deposit: NO_DEPOSIT
             }
@@ -83,6 +96,7 @@ export const useMarketplaceListings = () => {
       
       console.log('Purchase transaction successful:', res);
       toast.success(`Successfully purchased Product #${listing.product_id}!`);
+      toast.info('Owner will grant you NOVA access to decrypt the file');
       
       // Refresh the listings to show updated data
       await fetchListings();

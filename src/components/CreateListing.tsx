@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Package, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import GlowCard from '@/components/GlowCard';
 import { useNearWallet } from 'near-connect-hooks';
 import { toast } from 'sonner';
 
-const MARKETPLACE_CONTRACT = 'vitalhare6068.near';
+const MARKETPLACE_CONTRACT = 'busyward7488.near';
 
 interface CreateListingProps {
   uploadedCid?: string;
@@ -20,17 +20,35 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
   const { callFunction, signedAccountId } = useNearWallet();
   
   const [formData, setFormData] = useState({
-    productId: '',
-    price: '',
-    novaGroupId: uploadedGroupId || '',
+    productId: '1001',  // Pre-filled test data
+    price: '5',         // Pre-filled test data
+    novaGroupId: 'test_image_group_001',  // Pre-filled test data
     listType: 'Image' as 'Image' | 'Dataset' | 'Audio' | 'Other',
-    cid: uploadedCid || '',
-    gpOwner: signedAccountId || '',
+    cid: 'QmTestCID123456789abcdef',  // Pre-filled test CID
+    gpOwner: '',  // Will be filled with connected wallet
   });
   
   const [isCreating, setIsCreating] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Update gpOwner when wallet connects
+  useEffect(() => {
+    if (signedAccountId) {
+      setFormData(prev => ({ ...prev, gpOwner: signedAccountId }));
+    }
+  }, [signedAccountId]);
+
+  // Update form when upload data is provided
+  useEffect(() => {
+    if (uploadedCid || uploadedGroupId) {
+      setFormData(prev => ({
+        ...prev,
+        cid: uploadedCid || prev.cid,
+        novaGroupId: uploadedGroupId || prev.novaGroupId,
+      }));
+    }
+  }, [uploadedCid, uploadedGroupId]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -55,6 +73,17 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
     setSuccess(false);
 
     try {
+      console.log('Creating listing with args:', {
+        product_id: parseInt(formData.productId),
+        price: parseInt(formData.price),
+        nova_group_id: formData.novaGroupId,
+        list_type: formData.listType,
+        cid: formData.cid,
+        gp_owner: formData.gpOwner,
+        is_tee_verified: false,
+        tee_signature: null,
+      });
+
       // Call the create_listing function on the contract
       await callFunction({
         contractId: MARKETPLACE_CONTRACT,
@@ -66,20 +95,22 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
           list_type: formData.listType,
           cid: formData.cid,
           gp_owner: formData.gpOwner,
+          is_tee_verified: false,  // Required by updated contract
+          tee_signature: null,     // Required by updated contract
         },
       });
 
       setSuccess(true);
       toast.success('Listing created successfully!');
       
-      // Reset form after success
+      // Reset form after success (but keep test values for easy re-testing)
       setTimeout(() => {
         setFormData({
-          productId: '',
-          price: '',
-          novaGroupId: uploadedGroupId || '',
+          productId: String(parseInt(formData.productId) + 1), // Increment product ID
+          price: '5',
+          novaGroupId: uploadedGroupId || 'test_image_group_001',
           listType: 'Image',
-          cid: uploadedCid || '',
+          cid: uploadedCid || 'QmTestCID123456789abcdef',
           gpOwner: signedAccountId || '',
         });
         setSuccess(false);
@@ -102,9 +133,9 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
             <Package className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h3 className="text-xl font-semibold">Create Marketplace Listing</h3>
+            <h3 className="text-xl font-semibold">Create Test Listing</h3>
             <p className="text-sm text-muted-foreground">
-              List your encrypted file on the NEAR marketplace
+              Pre-filled with test data - just click Create!
             </p>
           </div>
         </div>
@@ -219,7 +250,7 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
               disabled={isCreating}
             />
             <p className="text-xs text-muted-foreground">
-              NEAR account that owns this listing
+              NEAR account that owns this listing (auto-filled from wallet)
             </p>
           </div>
 
@@ -243,7 +274,7 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
               className="flex items-start gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20"
             >
               <CheckCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-primary">Listing created successfully!</p>
+              <p className="text-sm text-primary">Test listing created successfully!</p>
             </motion.div>
           )}
 
@@ -262,7 +293,7 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
             ) : (
               <>
                 <Package className="h-5 w-5 mr-2" />
-                Create Listing
+                Create Test Listing
               </>
             )}
           </Button>
@@ -270,6 +301,12 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
           {!signedAccountId && (
             <p className="text-sm text-center text-muted-foreground">
               Please connect your NEAR wallet to create listings
+            </p>
+          )}
+          
+          {signedAccountId && (
+            <p className="text-sm text-center text-green-500">
+              ✓ Ready to create test listing for {signedAccountId}
             </p>
           )}
         </div>

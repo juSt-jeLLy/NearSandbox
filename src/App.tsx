@@ -24,7 +24,7 @@ const App = () => (
       config={{
         network: "mainnet",
         providers: {
-          mainnet: ["https://rpc.mainnet.near.org"]
+          testnet: ["https://rpc.mainnet.near.org"]
         }
       }}
     >

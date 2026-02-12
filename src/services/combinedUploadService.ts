@@ -1,7 +1,7 @@
 import { uploadFile, registerGroup } from './novaService';
 import { Buffer } from 'buffer';
 
-const MARKETPLACE_CONTRACT = 'vitalhare6068.near';
+const MARKETPLACE_CONTRACT = 'busyward7488.near';
 
 export interface CombinedUploadResult {
   // NOVA upload results
@@ -43,6 +43,7 @@ const generateGroupId = (filename: string): string => {
 };
 
 
+
 const generateProductId = (): number => {
   const timestampSeconds = Math.floor(Date.now() / 1000);
   const random = Math.floor(Math.random() * 1000);
@@ -62,14 +63,14 @@ export const uploadAndCreateListing = async (
   onProgress?: (progress: CombinedUploadProgress) => void
 ): Promise<CombinedUploadResult> => {
   
-  // Generate group ID from filename + random number
+  // Use fixed group ID
   const groupId = generateGroupId(file.name);
   
   // Generate unique product ID
   const productId = generateProductId();
   
   try {
-    // Step 1: Register group on NOVA
+    // Step 1: Register group on NOVA (COMMENTED OUT - using existing group)
     onProgress?.({
       step: 'registering_group',
       message: `Creating NOVA group: ${groupId}`
@@ -109,7 +110,11 @@ export const uploadAndCreateListing = async (
         list_type: assetType,
         cid: uploadResult.cid,
         gp_owner: ownerAccount,
+        is_tee_verified: false,  // TEE verification not implemented yet
+        tee_signature: null,     // No signature since not verified
       },
+      gas: '30000000000000', // 30 TGas
+      deposit: '0',          // No deposit required for listing creation
     });
     
     console.log(`✅ Listing created on marketplace. Product ID: ${productId}`);
