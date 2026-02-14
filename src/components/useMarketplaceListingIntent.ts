@@ -3,7 +3,16 @@ import { useNearWallet } from 'near-connect-hooks';
 import { toast } from 'sonner';
 import { getNovaCredentials } from '@/services/novaCredentialsService';
 import { dryRun, submitDepositTx, getExecutionStatus } from './tryIntent';
-import { connectMetaMask, sendOpUsdc, isMetaMaskInstalled } from './opWallet';
+import {
+  connectMetaMask,
+  connectMetaMaskToChain,
+  sendOpUsdc,
+  sendOpEth,
+  sendEthMainnet,
+  isMetaMaskInstalled,
+} from './opWallet';
+import { sendArbEth, sendArbUsdc, sendEthUsdc } from './opWallet';
+import type { BuyOptions } from './BuyModal';
 
 const MARKETPLACE_CONTRACT = 'busyward7488.near';
 
@@ -58,12 +67,13 @@ export const useMarketplaceListings = () => {
   // Buy listing function with all the logic
   /**
    * Full purchase flow:
-   * 1. Create 1Click quote (OP USDC -> NEAR USDC) and get deposit address.
-   * 2. Connect MetaMask and automatically send OP USDC to deposit address.
-   * 3. Submit deposit txHash to 1Click API.
-   * 4. Execute NEAR marketplace buy transaction.
+   * 1. User chooses origin chain/token and refund address (via BuyModal).
+   * 2. Create 1Click quote (origin -> wNEAR) and get deposit address.
+   * 3. Connect MetaMask and send origin token to deposit address.
+   * 4. Submit deposit txHash to 1Click API.
+   * 5. (Optional) Execute NEAR marketplace buy transaction.
    */
-  const buyListing = async (listing: Listing) => {
+  const buyListing = async (listing: Listing, options: BuyOptions) => {
     // Validation
     if (!signedAccountId) {
       toast.error('Please connect your NEAR wallet to make a purchase');
@@ -84,16 +94,13 @@ export const useMarketplaceListings = () => {
     setBuyingListingId(listing.product_id);
     
     try {
-      // Step 1: Prepare 1Click cross-chain payment intent (OP USDC -> wNEAR)
-      // listing.price is stored in CENTS (e.g., 1 = $0.01, 100 = $1.00)
-      // formatPrice divides by 100: price / 100 = dollar amount
-      const originBlockchain = 'op';
-      const originSymbol = 'USDC';
+      const { originBlockchain, originSymbol, refundTo } = options;
       const destBlockchain = 'near';
-      const destSymbol = 'wNEAR'; // Changed to wNEAR for native NEAR token
+      const destSymbol = 'wNEAR';
+      const recipient = listing.owner; // Payment goes to listing owner on NEAR
 
-      // Convert cents to USDC dollars (e.g., 1 cent -> 0.01 USDC)
-      // listing.price is in cents, so divide by 100 to get dollars
+      // Convert listing.price (cents) to human-readable amount
+      //to do: if the symbol is eth then convert usdc amt into eth 
       const usdcAmount = listing.price / 100;
       const amount = usdcAmount.toString();
 
@@ -103,32 +110,59 @@ export const useMarketplaceListings = () => {
         destBlockchain,
         destSymbol,
         amount,
-        '0xE379Aafc678098885c167dC87204A66ded45036c', // OP refund address
-        'weakice9214.near' // NEAR recipient address
+        refundTo,
+        recipient
       );
 
       console.log('1Click quote for marketplace purchase:', quote);
-      console.log('1Click deposit address (OP chain):', depositAddress);
+      console.log('1Click deposit address :', depositAddress);
       setDepositAddress(depositAddress || null);
 
       if (!depositAddress) {
-        throw new Error('Missing 1Click deposit address; cannot proceed with OP USDC deposit.');
+        throw new Error('Missing 1Click deposit address; cannot proceed with deposit.');
       }
 
-      // Step 2: Connect MetaMask and send OP USDC to deposit address
       if (!isMetaMaskInstalled()) {
-        toast.error('MetaMask is required to send OP USDC. Please install MetaMask and try again.');
+        toast.error('MetaMask is required. Please install MetaMask and try again.');
         throw new Error('MetaMask not installed');
       }
 
-      toast.info('Connecting to MetaMask...');
-      const opWalletAddress = await connectMetaMask();
-      console.log('Connected OP wallet:', opWalletAddress);
+      const isOp = originBlockchain === 'op';
+      const isArb = originBlockchain === 'arb';
+      const isEthNative = originSymbol === 'ETH';
 
-      toast.info('Please confirm the OP USDC transfer in MetaMask...');
-      const txHash = await sendOpUsdc(depositAddress, amount);
-      console.log('OP USDC transfer txHash:', txHash);
-      toast.success(`OP USDC sent! Transaction: ${txHash.substring(0, 10)}...`);
+          if (isOp) {
+            await connectMetaMaskToChain(10); // Optimism
+          } else if (isArb) {
+            await connectMetaMaskToChain(42161); // Arbitrum One
+          } else {
+            await connectMetaMaskToChain(1); // Ethereum mainnet
+          }
+      toast.info('Please confirm the transfer in MetaMask...');
+
+      let txHash: string;
+      if (isOp && originSymbol === 'USDC') {
+        txHash = await sendOpUsdc(depositAddress, amount);
+        toast.success(`USDC sent! Transaction: ${txHash.substring(0, 10)}...`);
+      } else if (isOp && originSymbol === 'ETH') {
+        txHash = await sendOpEth(depositAddress, amount);
+        toast.success(`ETH sent! Transaction: ${txHash.substring(0, 10)}...`);
+      } else if (isArb && originSymbol === 'USDC') {
+        txHash = await sendArbUsdc(depositAddress, amount);
+        toast.success(`USDC sent on Arbitrum! Transaction: ${txHash.substring(0, 10)}...`);
+      } else if (isArb && originSymbol === 'ETH') {
+        txHash = await sendArbEth(depositAddress, amount);
+        toast.success(`ETH sent on Arbitrum! Transaction: ${txHash.substring(0, 10)}...`);
+      } else if (!isOp && !isArb && originSymbol === 'ETH') {
+        txHash = await sendEthMainnet(depositAddress, amount);
+        toast.success(`ETH sent! Transaction: ${txHash.substring(0, 10)}...`);
+      } else if (!isOp && !isArb && originSymbol === 'USDC') {
+        txHash = await sendEthUsdc(depositAddress, amount);
+        toast.success(`USDC sent on Ethereum! Transaction: ${txHash.substring(0, 10)}...`);
+      } else {
+        throw new Error(`Unsupported origin: ${originBlockchain} ${originSymbol}`);
+      }
+      console.log('Transfer txHash:', txHash);
 
       // Step 3: Tell 1Click about the OP transaction
       toast.info('Submitting deposit to 1Click...');

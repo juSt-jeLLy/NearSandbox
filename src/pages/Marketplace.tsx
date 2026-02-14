@@ -4,8 +4,10 @@ import { Search, Filter, Grid, List, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import PageTransition from '@/components/PageTransition';
-import { useMarketplaceListings } from '@/components/useMarketplaceListings';
+import { useMarketplaceListings } from '@/components/useMarketplaceListingIntent';
 import { ProductCard } from '@/components/ProductCard';
+import { BuyModal } from '@/components/BuyModal';
+import type { Listing } from '@/components/useMarketplaceListingIntent';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -29,10 +31,20 @@ const itemVariants = {
 const Marketplace = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [buyModalOpen, setBuyModalOpen] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
 
-  // Fetch listings from NEAR contract
-  // buyListing now handles all the buy logic internally
   const { listings, loading, error, buyListing, buyingListingId } = useMarketplaceListings();
+
+  const handleBuyClick = (listing: Listing) => {
+    setSelectedListing(listing);
+    setBuyModalOpen(true);
+  };
+
+  const handleBuyConfirm = (options: Parameters<typeof buyListing>[1]) => {
+    if (!selectedListing) return;
+    buyListing(selectedListing, options);
+  };
 
   const filteredListings = listings.filter(
     (listing) =>
@@ -133,13 +145,21 @@ const Marketplace = () => {
                 <motion.div key={listing.product_id} variants={itemVariants}>
                   <ProductCard
                     listing={listing}
-                    onBuy={buyListing}
+                    onBuy={handleBuyClick}
                     isBuying={buyingListingId === listing.product_id}
                   />
                 </motion.div>
               ))}
             </motion.div>
           )}
+
+          <BuyModal
+            open={buyModalOpen}
+            onOpenChange={setBuyModalOpen}
+            listing={selectedListing}
+            onConfirm={handleBuyConfirm}
+            isBuying={!!buyingListingId}
+          />
 
           {/* Items List */}
           {!loading && !error && viewMode === 'list' && (
@@ -153,7 +173,7 @@ const Marketplace = () => {
                 <motion.div key={listing.product_id} variants={itemVariants}>
                   <ProductCard
                     listing={listing}
-                    onBuy={buyListing}
+                    onBuy={handleBuyClick}
                     isBuying={buyingListingId === listing.product_id}
                   />
                 </motion.div>
