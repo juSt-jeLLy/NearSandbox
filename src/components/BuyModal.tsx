@@ -18,15 +18,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-export type OriginOption = 'op-usdc' | 'op-eth' | 'eth-eth' | 'arb-usdc' | 'arb-eth'| 'eth-usdc';
+export type OriginOption = 'op-usdc' | 'op-eth' | 'eth-eth' | 'arb-usdc' | 'arb-eth' | 'eth-usdc' | 'near-wnear';
 
 const ORIGIN_OPTIONS: { value: OriginOption; label: string }[] = [
+  { value: 'near-wnear', label: 'wNEAR on NEAR (Direct)' },
   { value: 'op-usdc', label: 'USDC on Optimism' },
   { value: 'op-eth', label: 'ETH on Optimism' },
   { value: 'eth-eth', label: 'ETH on Ethereum' },
   { value: 'arb-usdc', label: 'USDC on Arbitrum' },
   { value: 'arb-eth', label: 'ETH on Arbitrum' },
-  //{value: 'eth-usdc', label:'USDC on Ethereum'}
 ];
 
 export interface BuyOptions {
@@ -60,36 +60,44 @@ const formatPrice = (price: number): string => {
 };
 
 export function BuyModal({ open, onOpenChange, listing, onConfirm, isBuying = false }: BuyModalProps) {
-  const [origin, setOrigin] = useState<OriginOption>('op-usdc');
+  const [origin, setOrigin] = useState<OriginOption>('near-wnear');
   const [refundTo, setRefundTo] = useState('');
 
-  // const handleConfirm = () => {
-  //   if (!refundTo.trim()) return;
-  //   const [originBlockchain, originSymbol] = origin === 'eth-eth' ? ['eth', 'ETH'] : ['op', origin === 'op-usdc' ? 'USDC' : 'ETH'];
-  //   onConfirm({ originBlockchain, originSymbol, refundTo: refundTo.trim() });
-  //   onOpenChange(false);
-  // };
+  const isNearDirect = origin === 'near-wnear';
+
   const handleConfirm = () => {
-  if (!refundTo.trim()) return;
+    // For NEAR direct, refundTo is not needed
+    if (isNearDirect) {
+      onConfirm({ 
+        originBlockchain: 'near', 
+        originSymbol: 'wNEAR',
+        refundTo: '' // Not needed for direct NEAR transfer
+      });
+      onOpenChange(false);
+      return;
+    }
 
-  const ORIGIN_MAP = {
-    'op-usdc':  { originBlockchain: 'op',  originSymbol: 'USDC' },
-    'op-eth':   { originBlockchain: 'op',  originSymbol: 'ETH'  },
-    'eth-eth':  { originBlockchain: 'eth', originSymbol: 'ETH'  },
-    'arb-usdc': { originBlockchain: 'arb', originSymbol: 'USDC' },
-    'arb-eth':  { originBlockchain: 'arb', originSymbol: 'ETH'  },
-    'eth-usdc': { originBlockchain: 'eth', originSymbol: 'USDC' },
+    // For cross-chain, require refund address
+    if (!refundTo.trim()) return;
+
+    const ORIGIN_MAP = {
+      'op-usdc':  { originBlockchain: 'op',  originSymbol: 'USDC' },
+      'op-eth':   { originBlockchain: 'op',  originSymbol: 'ETH'  },
+      'eth-eth':  { originBlockchain: 'eth', originSymbol: 'ETH'  },
+      'arb-usdc': { originBlockchain: 'arb', originSymbol: 'USDC' },
+      'arb-eth':  { originBlockchain: 'arb', originSymbol: 'ETH'  },
+      'eth-usdc': { originBlockchain: 'eth', originSymbol: 'USDC' },
+    };
+
+    const selection = ORIGIN_MAP[origin as keyof typeof ORIGIN_MAP];
+    if (selection) {
+      onConfirm({ 
+        ...selection, 
+        refundTo: refundTo.trim() 
+      });
+      onOpenChange(false);
+    }
   };
-
-  const selection = ORIGIN_MAP[origin];
-  if (selection) {
-    onConfirm({ 
-      ...selection, 
-      refundTo: refundTo.trim() 
-    });
-    onOpenChange(false);
-  }
-};
 
   if (!listing) return null;
 
@@ -97,9 +105,13 @@ export function BuyModal({ open, onOpenChange, listing, onConfirm, isBuying = fa
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Pay with cross-chain</DialogTitle>
+          <DialogTitle>
+            {isNearDirect ? 'Pay with wNEAR on NEAR' : 'Pay with cross-chain'}
+          </DialogTitle>
           <DialogDescription>
-            Choose your origin chain and token, and where to refund if needed. Payment will go to the listing owner on NEAR.
+            {isNearDirect 
+              ? 'Direct payment from your NEAR wallet to the seller.'
+              : 'Choose your origin chain and token, and where to refund if needed. Payment will go to the listing owner on NEAR.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -110,10 +122,10 @@ export function BuyModal({ open, onOpenChange, listing, onConfirm, isBuying = fa
           </div>
 
           <div className="space-y-2">
-            <Label>Origin chain & token</Label>
+            <Label>Payment method</Label>
             <Select value={origin} onValueChange={(v) => setOrigin(v as OriginOption)}>
               <SelectTrigger>
-                <SelectValue placeholder="Select origin" />
+                <SelectValue placeholder="Select payment method" />
               </SelectTrigger>
               <SelectContent>
                 {ORIGIN_OPTIONS.map((opt) => (
@@ -125,24 +137,38 @@ export function BuyModal({ open, onOpenChange, listing, onConfirm, isBuying = fa
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="refund">Refund address (origin chain)</Label>
-            <Input
-              id="refund"
-              placeholder="0x... or your wallet address on origin chain"
-              value={refundTo}
-              onChange={(e) => setRefundTo(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              If the swap cannot be completed, funds are returned to this address.
-            </p>
-          </div>
+          {!isNearDirect && (
+            <div className="space-y-2">
+              <Label htmlFor="refund">Refund address (origin chain)</Label>
+              <Input
+                id="refund"
+                placeholder="0x... or your wallet address on origin chain"
+                value={refundTo}
+                onChange={(e) => setRefundTo(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                If the swap cannot be completed, funds are returned to this address.
+              </p>
+            </div>
+          )}
 
           <div className="rounded-lg border bg-muted/50 p-3 space-y-1">
-            <Label className="text-muted-foreground">Destination (fixed)</Label>
-            <p className="text-sm font-medium">Chain: NEAR</p>
-            <p className="text-sm font-medium">Token: wNEAR</p>
-            <p className="text-sm font-medium">Recipient (listing owner): <span className="font-mono text-xs">{listing.owner}</span></p>
+            <Label className="text-muted-foreground">
+              {isNearDirect ? 'Payment Details' : 'Destination (fixed)'}
+            </Label>
+            {isNearDirect ? (
+              <>
+                <p className="text-sm font-medium">Direct NEAR transfer</p>
+                <p className="text-sm font-medium">Token: wNEAR</p>
+                <p className="text-sm font-medium">To: <span className="font-mono text-xs">{listing.owner}</span></p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium">Chain: NEAR</p>
+                <p className="text-sm font-medium">Token: wNEAR</p>
+                <p className="text-sm font-medium">Recipient (listing owner): <span className="font-mono text-xs">{listing.owner}</span></p>
+              </>
+            )}
           </div>
         </div>
 
@@ -150,7 +176,10 @@ export function BuyModal({ open, onOpenChange, listing, onConfirm, isBuying = fa
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isBuying}>
             Cancel
           </Button>
-          <Button onClick={handleConfirm} disabled={isBuying || !refundTo.trim()}>
+          <Button 
+            onClick={handleConfirm} 
+            disabled={isBuying || (!isNearDirect && !refundTo.trim())}
+          >
             {isBuying ? 'Processing...' : 'Continue to payment'}
           </Button>
         </DialogFooter>
