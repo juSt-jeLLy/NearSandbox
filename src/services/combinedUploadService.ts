@@ -1,7 +1,7 @@
 import { uploadFile, registerGroup } from './novaService';
 import { Buffer } from 'buffer';
 
-const MARKETPLACE_CONTRACT = 'busyward7488.near';
+const MARKETPLACE_CONTRACT = 'singlelibrary5839.near';
 
 export interface CombinedUploadResult {
   // NOVA upload results
