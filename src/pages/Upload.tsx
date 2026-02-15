@@ -436,24 +436,7 @@ const Upload = () => {
             )}
           </AnimatePresence>
 
-          {/* Manual Create Listing Section (For Testing) */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mt-8 pt-8 border-t border-border"
-          >
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold mb-2">Manual Listing Creation</h2>
-              <p className="text-sm text-muted-foreground">
-                Or create a marketplace listing manually with custom parameters
-              </p>
-            </div>
-            <CreateListing 
-              uploadedCid={uploadResult?.cid}
-              uploadedGroupId={uploadResult?.groupId}
-            />
-          </motion.div>
+
         </div>
       </div>
     </PageTransition>

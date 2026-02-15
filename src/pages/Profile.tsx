@@ -473,26 +473,7 @@ const Profile = () => {
                                 )}
                               </Button>
                               
-                              {/* Test Button - Contract only (no NOVA) */}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1"
-                                onClick={() => handleTestGrantAccess(listing)}
-                                disabled={testingAccessProductId === listing.product_id}
-                              >
-                                {testingAccessProductId === listing.product_id ? (
-                                  <>
-                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                    Testing...
-                                  </>
-                                ) : (
-                                  <>
-                                    <TestTube className="h-3 w-3 mr-1" />
-                                    Test ({listing.pendingBuyers})
-                                  </>
-                                )}
-                              </Button>
+
                             </div>
                           )}
                           

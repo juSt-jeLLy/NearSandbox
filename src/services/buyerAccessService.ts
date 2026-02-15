@@ -1,6 +1,6 @@
 import { addGroupMember, revokeGroupMember } from './novaService';
 
-const MARKETPLACE_CONTRACT = 'busyward7488.near';
+const MARKETPLACE_CONTRACT = 'singlelibrary5839.near';
 
 export interface BuyerAccessStatus {
   buyer: string;
