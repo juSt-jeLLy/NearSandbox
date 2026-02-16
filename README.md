@@ -1,10 +1,10 @@
-# NOVAMarket
+# Semicolon
 
 A decentralized marketplace for encrypted digital assets built on NEAR Protocol, leveraging NOVA SDK for privacy-first file storage and AI-powered credibility scoring via TEE (Trusted Execution Environment).
 
 ## 🌟 Overview
 
-NOVAMarket enables users to securely buy and sell digital assets with end-to-end encryption. Files are encrypted client-side, stored on IPFS via NOVA Protocol, and access is managed through NEAR smart contracts. Each listing is verified using NEAR AI's private inference in TEE for credibility scoring.
+Semicolon enables users to securely buy and sell digital assets with end-to-end encryption. Files are encrypted clientside, stored on NOVA Protocol, and access is managed through NEAR smart contracts. Each listing is verified using NEAR AI's private inference in TEE for credibility scoring.
 
 ### Key Features
 
