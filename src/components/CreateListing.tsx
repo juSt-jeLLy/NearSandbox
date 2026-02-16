@@ -63,77 +63,76 @@ const CreateListing = ({ uploadedCid, uploadedGroupId, teeVerified, teeScore }: 
     setSuccess(false);
   };
 
-  const handleCreateListing = async () => {
-    // Validation
-    if (!formData.productId || !formData.price || !formData.novaGroupId || !formData.cid || !formData.gpOwner) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
+const handleCreateListing = async () => {
+  // Validation
+  if (!formData.productId || !formData.price || !formData.novaGroupId || !formData.cid || !formData.gpOwner) {
+    toast.error('Please fill in all required fields');
+    return;
+  }
 
-    if (!signedAccountId) {
-      toast.error('Please connect your NEAR wallet first');
-      return;
-    }
+  if (!signedAccountId) {
+    toast.error('Please connect your NEAR wallet first');
+    return;
+  }
 
-    // Validate TEE signature if TEE verified is enabled
-    if (formData.isTeeVerified && (formData.teeSignature === null || formData.teeSignature < 0 || formData.teeSignature > 100)) {
-      toast.error('TEE signature must be between 0 and 100 when TEE verified is enabled');
-      return;
-    }
+  // Validate TEE signature if TEE verified is enabled
+  if (formData.isTeeVerified && (formData.teeSignature === null || formData.teeSignature < 0 || formData.teeSignature > 100)) {
+    toast.error('TEE signature must be between 0 and 100 when TEE verified is enabled');
+    return;
+  }
 
-    setIsCreating(true);
-    setError(null);
-    setSuccess(false);
+  setIsCreating(true);
+  setError(null);
+  setSuccess(false);
 
-    try {
-      const args = {
-        product_id: parseInt(formData.productId),
-        price: parseInt(formData.price),
-        nova_group_id: formData.novaGroupId,
-        list_type: formData.listType,
-        cid: formData.cid,
-        gp_owner: formData.gpOwner,
-        is_tee_verified: formData.isTeeVerified,
-        tee_signature: formData.isTeeVerified && formData.teeSignature !== null 
-          ? formData.teeSignature.toString() 
-          : null,
-      };
+  try {
+    const args = {
+      product_id: parseInt(formData.productId),
+      price: Math.abs(parseInt(formData.price)), // Ensure positive
+      nova_group_id: formData.novaGroupId,
+      list_type: formData.listType,
+      cid: formData.cid,
+      gp_owner: formData.gpOwner,
+      is_tee_verified: formData.isTeeVerified, // boolean: true or false
+      tee_signature: formData.isTeeVerified && formData.teeSignature !== null 
+        ? formData.teeSignature.toString() // Convert number to string!
+        : null,
+    };
 
-      console.log('Creating listing with args:', args);
+    console.log('Creating listing with args:', args);
 
-      // Call the create_listing function on the contract
-      await callFunction({
-        contractId: MARKETPLACE_CONTRACT,
-        method: 'create_listing',
-        args,
+    await callFunction({
+      contractId: MARKETPLACE_CONTRACT,
+      method: 'create_listing',
+      args,
+    });
+
+    setSuccess(true);
+    toast.success('Listing created successfully!');
+    
+    // Reset form after success
+    setTimeout(() => {
+      setFormData({
+        productId: String(parseInt(formData.productId) + 1),
+        price: '5',
+        novaGroupId: uploadedGroupId || 'test_image_group_001',
+        listType: 'Image',
+        cid: uploadedCid || 'QmTestCID123456789abcdef',
+        gpOwner: signedAccountId || '',
+        isTeeVerified: false,
+        teeSignature: null,
       });
-
-      setSuccess(true);
-      toast.success('Listing created successfully!');
-      
-      // Reset form after success (but keep test values for easy re-testing)
-      setTimeout(() => {
-        setFormData({
-          productId: String(parseInt(formData.productId) + 1), // Increment product ID
-          price: '5',
-          novaGroupId: uploadedGroupId || 'test_image_group_001',
-          listType: 'Image',
-          cid: uploadedCid || 'QmTestCID123456789abcdef',
-          gpOwner: signedAccountId || '',
-          isTeeVerified: false,
-          teeSignature: null,
-        });
-        setSuccess(false);
-      }, 3000);
-    } catch (err: any) {
-      console.error('Failed to create listing:', err);
-      const errorMessage = err.message || 'Failed to create listing';
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setIsCreating(false);
-    }
-  };
+      setSuccess(false);
+    }, 3000);
+  } catch (err: any) {
+    console.error('Failed to create listing:', err);
+    const errorMessage = err.message || 'Failed to create listing';
+    setError(errorMessage);
+    toast.error(errorMessage);
+  } finally {
+    setIsCreating(false);
+  }
+};
 
   return (
     <GlowCard glowOnHover={false}>

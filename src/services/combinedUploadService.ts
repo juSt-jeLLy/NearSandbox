@@ -161,7 +161,7 @@ export const uploadAndCreateListing = async (
         list_type: assetType,
         cid: uploadResult.cid,
         gp_owner: ownerAccount,
-        is_tee_verified: aiScore !== null,
+        is_tee_verified: true,
         tee_signature: aiScore !== null ? aiScore : null,
       },
       gas: '30000000000000', // 30 TGas
