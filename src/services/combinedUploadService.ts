@@ -1,3 +1,4 @@
+import { getFileCredibilityScoreFromBuffer } from '@/components/nearai';
 import { uploadFile, registerGroup } from './novaService';
 import { Buffer } from 'buffer';
 
@@ -70,6 +71,11 @@ export const uploadAndCreateListing = async (
   const productId = generateProductId();
   
   try {
+      // Read file as ArrayBuffer and convert to Buffer (works in both environments)
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBuffer = Buffer.from(arrayBuffer);
+    const aiScore=getFileCredibilityScoreFromBuffer(fileBuffer,'') || null;
+    console.log('ai score is ', aiScore);
     // Step 1: Register group on NOVA (COMMENTED OUT - using existing group)
     onProgress?.({
       step: 'registering_group',
@@ -86,58 +92,56 @@ export const uploadAndCreateListing = async (
       message: 'Encrypting and uploading to IPFS via NOVA...'
     });
     
-    // Read file as ArrayBuffer and convert to Buffer (works in both environments)
-    const arrayBuffer = await file.arrayBuffer();
-    const fileBuffer = Buffer.from(arrayBuffer);
+
     
     // IMPORTANT: Pass ownerAccount (NEAR wallet) to uploadFile
     const uploadResult = await uploadFile(groupId, fileBuffer, file.name, ownerAccount);
     console.log(`✅ File uploaded to NOVA. CID: ${uploadResult.cid}`);
     
     // Run NEAR private AI credibility check . If it fails, continue without blocking.
-    let aiScore: number | null = null;
-    try {
-      // Prepare base64 payload for image
-      const base64Image = fileBuffer.toString('base64');
-      // Prompt: ask strictly for a single numeric score 0-100
-      const systemPrompt = `You are an expert digital product appraiser. Strictly return a single numeric credibility score between 0 and 100 and nothing else.`;
-      const userPrompt = `Seller Description: ${''}`;
+    // let aiScore: number | null = null;
+    // try {
+    //   // Prepare base64 payload for image
+    //   const base64Image = fileBuffer.toString('base64');
+    //   // Prompt: ask strictly for a single numeric score 0-100
+    //   const systemPrompt = `You are an expert digital product appraiser. Strictly return a single numeric credibility score between 0 and 100 and nothing else.`;
+    //   const userPrompt = `Seller Description: ${''}`;
 
-      const apiKey = process.env.OPENAI_API_KEY || process.env.NEAR_AI_API_KEY || '';
-      if (!apiKey) throw new Error('Missing NEAR AI API key');
+    //   const apiKey = process.env.OPENAI_API_KEY || process.env.NEAR_AI_API_KEY || '';
+    //   if (!apiKey) throw new Error('Missing NEAR AI API key');
 
-      const res = await fetch('https://cloud-api.near.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-            { role: 'user', content: `Image: data:image/png;base64,${base64Image}` },
-          ],
-          max_tokens: 8,
-        }),
-      });
+    //   const res = await fetch('https://cloud-api.near.ai/v1/chat/completions', {
+    //     method: 'POST',
+    //     headers: {
+    //       'Content-Type': 'application/json',
+    //       'Authorization': `Bearer ${apiKey}`,
+    //     },
+    //     body: JSON.stringify({
+    //       model: 'gpt-4o',
+    //       messages: [
+    //         { role: 'system', content: systemPrompt },
+    //         { role: 'user', content: userPrompt },
+    //         { role: 'user', content: `Image: data:image/png;base64,${base64Image}` },
+    //       ],
+    //       max_tokens: 8,
+    //     }),
+    //   });
 
-      if (!res.ok) {
-        const errBody = await res.text();
-        throw new Error(`NEAR AI API returned ${res.status}: ${errBody}`);
-      }
+    //   if (!res.ok) {
+    //     const errBody = await res.text();
+    //     throw new Error(`NEAR AI API returned ${res.status}: ${errBody}`);
+    //   }
 
-      const json = await res.json();
-      const content = json.choices?.[0]?.message?.content || json.choices?.[0]?.text || '';
-      const scoreMatch = (content || '').toString().trim().match(/\d{1,3}(?:\.\d+)?/);
-      if (!scoreMatch) throw new Error('Failed to parse score from AI response: ' + content);
-      aiScore = parseFloat(scoreMatch[0]);
-      console.log('AI credibility score obtained:', aiScore);
-    } catch (aiErr) {
-      console.error('NEAR AI check failed, continuing without TEE verification:', aiErr);
-      aiScore = null;
-    }
+    //   const json = await res.json();
+    //   const content = json.choices?.[0]?.message?.content || json.choices?.[0]?.text || '';
+    //   const scoreMatch = (content || '').toString().trim().match(/\d{1,3}(?:\.\d+)?/);
+    //   if (!scoreMatch) throw new Error('Failed to parse score from AI response: ' + content);
+    //   aiScore = parseFloat(scoreMatch[0]);
+    //   console.log('AI credibility score obtained:', aiScore);
+    // } catch (aiErr) {
+    //   console.error('NEAR AI check failed, continuing without TEE verification:', aiErr);
+    //   aiScore = null;
+    // }
 
     // Step 3: Create marketplace listing
     onProgress?.({

@@ -1,10 +1,10 @@
 import OpenAI from 'openai';
 import fs from 'fs';
 
-const openai = new OpenAI({
-  baseURL: 'https://cloud-api.near.ai/v1',
-  apiKey: process.env.OPENAI_API_KEY, 
-});
+// const openai = new OpenAI({
+//   baseURL: 'https://cloud-api.near.ai/v1',
+//   apiKey: process.env.OPENAI_API_KEY, 
+// });
 
 
 async function getFileCredibilityScore(filePath: string, description: string) {
@@ -15,6 +15,12 @@ async function getFileCredibilityScore(filePath: string, description: string) {
 
 export async function getFileCredibilityScoreFromBuffer(fileBuffer: Buffer | Uint8Array, description: string): Promise<number> {
   try {
+  const OPENAI_API_KEY=''
+  const openai = new OpenAI({
+  baseURL: `${window.location.origin}/near-api/v1`,
+  apiKey: OPENAI_API_KEY, 
+  dangerouslyAllowBrowser: true,
+  });
     const base64Image = Buffer.from(fileBuffer).toString('base64');
     // Try to infer an image type (fallback to png)
     const fileExtension = 'png';
@@ -58,6 +64,10 @@ export async function getFileCredibilityScoreFromBuffer(fileBuffer: Buffer | Uin
 
 
 async function uploadToNearCloud(filePath: string) {
+  const openai = new OpenAI({
+  baseURL: 'https://cloud-api.near.ai/v1',
+  apiKey: process.env.OPENAI_API_KEY, 
+});
   const file = await openai.files.create({
     file: fs.createReadStream(filePath),
     purpose: 'assistants',
