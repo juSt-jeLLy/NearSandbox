@@ -48,6 +48,10 @@ npm run dev
 
 Visit `http://localhost:5173`
 
+## Few sample near intent transaction for asset purchase done on our platform 
+- (https://explorer.near-intents.org/transactions/0x85A41CDfb41f9ef7c0e04de2Fa4aFd084d995D64)
+- (https://explorer.near-intents.org/transactions/0x0B8D1806aBc3584a6408285C7d2bB436b08dEb14)
+
 ### Environment Variables
 ```env
 
