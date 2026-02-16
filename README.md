@@ -203,7 +203,7 @@ Built with:
 - **NOVA Protocol** - Encrypted storage
 - **NEAR Protocol** - Smart contracts
 - **NEAR AI Cloud** - Private inference
-- **1Click Protocol** - Cross-chain swaps
+- **1Click API** - Cross-chain swaps
 - **Shade Agents** - TEE key management
 
 ---
