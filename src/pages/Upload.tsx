@@ -415,7 +415,7 @@ const Upload = () => {
                             <Copy className="h-4 w-4" />
                           </Button>
                           <a
-                            href={`https://testnet.nearblocks.io/txns/${uploadResult.trans_id}`}
+                            href={`https://nearblocks.io/txns/${uploadResult.trans_id}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
