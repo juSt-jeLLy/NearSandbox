@@ -20,6 +20,7 @@ const Upload = () => {
   const [file, setFile] = useState<File | null>(null);
   const [assetType, setAssetType] = useState<'Image' | 'Dataset' | 'Audio' | 'Other'>('Image');
   const [price, setPrice] = useState('');
+  const [description, setDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<CombinedUploadProgress | null>(null);
   const [uploadResult, setUploadResult] = useState<CombinedUploadResult | null>(null);
@@ -56,6 +57,7 @@ const Upload = () => {
   }, []);
 
   const handleUpload = async () => {
+    //
     if (!file || !price.trim()) {
       toast.error('Please select a file and enter a price');
       return;
@@ -80,6 +82,7 @@ const Upload = () => {
 
     try {
       const result = await uploadAndCreateListing(
+        description,
         file,
         assetType,
         parseInt(price),
@@ -204,6 +207,23 @@ const Upload = () => {
                 />
                 <p className="text-xs text-muted-foreground">
                   Price for your encrypted file on the marketplace
+                </p>
+              </div>
+
+              {/* Description Input */}
+              <div className="space-y-2">
+                <Label htmlFor="description">Description (optional)</Label>
+                <textarea
+                  id="description"
+                  placeholder="Tell buyers a little about your product or digital good"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  disabled={isUploading}
+                  rows={4}
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm resize-none"
+                />
+                <p className="text-xs text-muted-foreground">
+                  A short description buyers will see on the marketplace listing
                 </p>
               </div>
 

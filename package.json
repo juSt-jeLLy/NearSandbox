@@ -68,6 +68,7 @@
     "near-connect-hooks": "^1.0.3",
     "next-themes": "^0.3.0",
     "nova-sdk-js": "^1.0.3",
+    "openai": "^6.22.0",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",

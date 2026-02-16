@@ -39,6 +39,11 @@ export default defineConfig({
         secure: false,
         rewrite: (path) => path.replace(/^\/mcp-api/, ''),
       },
+      '/near-api': {
+        target: 'https://cloud-api.near.ai',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/near-api/, ''),
+      },
     },
   },
 });
