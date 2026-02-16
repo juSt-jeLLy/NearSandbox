@@ -25,7 +25,7 @@ export async function getFileCredibilityScoreFromBuffer(
       messages: [
         {
           role: 'system',
-          content: `You are an expert digital product appraiser. Analyze the provided file and the seller's description. Strictly return the credibility score as a single numeric value between 60 and 100 and nothing else (no JSON, no text).`
+          content: `You are an expert digital product appraiser. Analyze the provided file and the seller's description. Strictly return the credibility score as a single numeric value between 20 and 100 and nothing else (no JSON, no text).`
         },
         {
           role: 'user',
