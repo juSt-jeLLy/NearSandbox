@@ -1,12 +1,12 @@
 # Semicolon
 
-A decentralized marketplace for encrypted digital assets built on NEAR Protocol, leveraging NOVA SDK for privacy-first file storage and AI-powered credibility scoring via TEE (Trusted Execution Environment).
+A decentralized marketplace for encrypted digital assets built on NEAR Protocol, leveraging NOVA SDK for privacy-first file storage and AI-powered credibility scoring via TEE (Trusted Execution Environment) and Near Intents for seamless cross chain payments.
 
 ## 🌟 Overview
 
 Semicolon enables users to securely buy and sell digital assets with end-to-end encryption. Files are encrypted clientside, stored on NOVA Protocol, and access is managed through NEAR smart contracts. Each listing is verified using NEAR AI's private inference in TEE for credibility scoring.
 
-Each listing is verified using NEAR AI's private inference running in a Trusted Execution Environment (TEE), providing an AI-powered credibility score that helps buyers assess product quality before purchase. The entire system is built on E2E encyption principles: encryption keys are managed off-chain in hardware-secured TEEs via Shade Agents, sellers maintain granular control over who can decrypt their files, and even cloud providers cannot access the plaintext data. This creates a decentralized marketplace where privacy, security, and transparency coexist—you own your data, control who accesses it, and can verify every transaction on-chain while keeping your intellectual property completely private.
+Each listing is verified using NEAR AI's private inference running in a Trusted Execution Environment (TEE), providing an AI-powered credibility score that helps buyers assess product quality before purchase. The entire system is built on zero-knowledge principles: encryption keys are managed off-chain in hardware-secured TEEs via Shade Agents, sellers maintain granular control over who can decrypt their files, and even cloud providers cannot access the plaintext data. This creates a decentralized marketplace where privacy, security, and transparency coexist—you own your data, control who accesses it, and can verify every transaction on-chain while keeping your intellectual property completely private. 
 
 
 ### Key Features
@@ -18,7 +18,7 @@ Each listing is verified using NEAR AI's private inference running in a Trusted 
 - 💳 **Multi-Chain Payments**: NEAR, Optimism, Arbitrum, Ethereum support
 - 🔑 **Granular Access Control**: Smart contract-managed buyer access
 - 🛡️ **Privacy-First**: Zero-knowledge architecture with TEE attestation
-- 🚀 **Cross-Chain Swaps**: 1Click protocol integration
+- 🚀 **Cross-Chain Swaps**: 1Click api(Near Intent) integration
 
 ## 🚀 Getting Started
 
@@ -50,10 +50,11 @@ Visit `http://localhost:5173`
 
 ### Environment Variables
 ```env
+
 # NEAR AI API Key (for TEE credibility scoring)
 VITE_OPENAI_API_KEY=your_near_ai_key
 
-# 1Click Protocol Token (for cross-chain swaps)
+# 1Click api Token (for cross-chain swaps)
 VITE_TOKEN=your_1click_token
 ```
 
@@ -89,7 +90,7 @@ VITE_TOKEN=your_1click_token
    - 40-59 (Orange) - Moderate
    - <40 (Red) - Low credibility
 
-3. Choose payment method:
+3. Choose payment method(powered by near intents):
    - **Direct NEAR**: Fastest, no fees
    - **Cross-Chain**: Pay with USDC/ETH from other chains
 
@@ -152,7 +153,7 @@ has_access(p_id, buyer) -> bool
 
 ## 🔄 Cross-Chain Payments
 
-Powered by 1Click Protocol:
+Powered by 1Click API:
 
 1. Select origin chain (Optimism/Arbitrum/Ethereum)
 2. 1Click generates deposit address
