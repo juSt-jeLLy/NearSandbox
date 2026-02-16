@@ -1,6 +1,7 @@
-import { getFileCredibilityScoreFromBuffer } from '@/components/nearai';
+import { getFileCredibilityScoreFromBuffer} from '@/components/nearai';
 import { uploadFile, registerGroup } from './novaService';
 import { Buffer } from 'buffer';
+
 
 const MARKETPLACE_CONTRACT = 'singlelibrary5839.near';
 
@@ -56,6 +57,7 @@ const generateProductId = (): number => {
 
 
 export const uploadAndCreateListing = async (
+  description,
   file: File,
   assetType: 'Image' | 'Dataset' | 'Audio' | 'Other',
   price: number,
@@ -74,7 +76,7 @@ export const uploadAndCreateListing = async (
       // Read file as ArrayBuffer and convert to Buffer (works in both environments)
     const arrayBuffer = await file.arrayBuffer();
     const fileBuffer = Buffer.from(arrayBuffer);
-    const aiScore=getFileCredibilityScoreFromBuffer(fileBuffer,'') || null;
+    const aiScore=getFileCredibilityScoreFromBuffer(fileBuffer,description) || null;
     console.log('ai score is ', aiScore);
     // Step 1: Register group on NOVA (COMMENTED OUT - using existing group)
     onProgress?.({

@@ -82,6 +82,7 @@ const Upload = () => {
 
     try {
       const result = await uploadAndCreateListing(
+        description,
         file,
         assetType,
         parseInt(price),

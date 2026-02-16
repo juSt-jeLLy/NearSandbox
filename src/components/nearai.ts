@@ -15,10 +15,10 @@ async function getFileCredibilityScore(filePath: string, description: string) {
 
 export async function getFileCredibilityScoreFromBuffer(fileBuffer: Buffer | Uint8Array, description: string): Promise<number> {
   try {
-  const OPENAI_API_KEY=''
+  
   const openai = new OpenAI({
   baseURL: `${window.location.origin}/near-api/v1`,
-  apiKey: OPENAI_API_KEY, 
+  apiKey: process.env.OPENAI_API_KEY, 
   dangerouslyAllowBrowser: true,
   });
     const base64Image = Buffer.from(fileBuffer).toString('base64');
@@ -26,11 +26,11 @@ export async function getFileCredibilityScoreFromBuffer(fileBuffer: Buffer | Uin
     const fileExtension = 'png';
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'deepseek-ai/DeepSeek-V3.1',
       messages: [
         {
           role: 'system',
-          content: `You are an expert digital product appraiser. Analyze the provided file and the seller's description. Strictly return the credibility score as a single numeric value between 0 and 100 and nothing else (no JSON, no text).`
+          content: `You are an expert digital product appraiser. Analyze the provided file and the seller's description. Strictly return the credibility score as a single numeric value between 0 and 100 and nothing else (no JSON, no text). Give atleast 1 `
         },
         {
           role: 'user',
