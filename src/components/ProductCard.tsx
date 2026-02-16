@@ -1,4 +1,4 @@
-import { Lock, Download, Eye } from 'lucide-react';
+import { Lock, Download, Eye, ShieldCheck, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import GlowCard from '@/components/GlowCard';
 
@@ -11,6 +11,8 @@ interface Listing {
   list_type: 'Image' | 'Dataset' | 'Audio' | 'Other';
   cid: string;
   is_active: boolean;
+  is_tee_verified: boolean;
+  tee_signature: number | null;
 }
 
 interface ProductCardProps {
@@ -37,6 +39,20 @@ const formatPrice = (price: number): string => {
   return `$${(price / 100).toFixed(2)}`;
 };
 
+const getScoreColor = (score: number): string => {
+  if (score >= 80) return 'text-green-400';
+  if (score >= 60) return 'text-yellow-400';
+  if (score >= 40) return 'text-orange-400';
+  return 'text-red-400';
+};
+
+const getScoreBgColor = (score: number): string => {
+  if (score >= 80) return 'bg-green-500/10';
+  if (score >= 60) return 'bg-yellow-500/10';
+  if (score >= 40) return 'bg-orange-500/10';
+  return 'bg-red-500/10';
+};
+
 export const ProductCard = ({ listing, onBuy, onPreview, isBuying = false }: ProductCardProps) => {
   return (
     <GlowCard className="h-full">
@@ -44,19 +60,55 @@ export const ProductCard = ({ listing, onBuy, onPreview, isBuying = false }: Pro
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <span
-              className={`inline-block px-2 py-1 rounded-md text-xs font-medium ${getTypeColor(
-                listing.list_type
-              )} mb-2`}
-            >
-              {listing.list_type}
-            </span>
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span
+                className={`inline-block px-2 py-1 rounded-md text-xs font-medium ${getTypeColor(
+                  listing.list_type
+                )}`}
+              >
+                {listing.list_type}
+              </span>
+              
+              {/* TEE Verification Badge */}
+              {listing.is_tee_verified && listing.tee_signature !== null ? (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-green-500/10 text-green-400">
+                  <ShieldCheck className="h-3 w-3" />
+                  TEE Verified
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-gray-500/10 text-gray-400">
+                  <Shield className="h-3 w-3" />
+                  Unverified
+                </span>
+              )}
+            </div>
             <h3 className="font-semibold text-lg">Product #{listing.product_id}</h3>
           </div>
           <div className="p-2 rounded-lg bg-primary/10">
             <Lock className="h-4 w-4 text-primary" />
           </div>
         </div>
+
+        {/* TEE Credibility Score */}
+        {listing.is_tee_verified && listing.tee_signature !== null && (
+          <div className={`p-3 rounded-lg ${getScoreBgColor(listing.tee_signature)}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">AI Credibility Score</p>
+                <p className={`text-2xl font-bold ${getScoreColor(listing.tee_signature)}`}>
+                  {listing.tee_signature}/100
+                </p>
+              </div>
+              <ShieldCheck className={`h-8 w-8 ${getScoreColor(listing.tee_signature)}`} />
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {listing.tee_signature >= 80 && "Highly trustworthy product"}
+              {listing.tee_signature >= 60 && listing.tee_signature < 80 && "Good quality product"}
+              {listing.tee_signature >= 40 && listing.tee_signature < 60 && "Moderate quality"}
+              {listing.tee_signature < 40 && "Low credibility - buy with caution"}
+            </p>
+          </div>
+        )}
 
         {/* Group ID */}
         <div>

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Package, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Package, Loader2, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import GlowCard from '@/components/GlowCard';
 import { useNearWallet } from 'near-connect-hooks';
 import { toast } from 'sonner';
@@ -14,9 +15,11 @@ const MARKETPLACE_CONTRACT = 'singlelibrary5839.near';
 interface CreateListingProps {
   uploadedCid?: string;
   uploadedGroupId?: string;
+  teeVerified?: boolean;
+  teeScore?: number;
 }
 
-const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => {
+const CreateListing = ({ uploadedCid, uploadedGroupId, teeVerified, teeScore }: CreateListingProps) => {
   const { callFunction, signedAccountId } = useNearWallet();
   
   const [formData, setFormData] = useState({
@@ -26,6 +29,8 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
     listType: 'Image' as 'Image' | 'Dataset' | 'Audio' | 'Other',
     cid: 'QmTestCID123456789abcdef',  // Pre-filled test CID
     gpOwner: '',  // Will be filled with connected wallet
+    isTeeVerified: false,
+    teeSignature: null as number | null,
   });
   
   const [isCreating, setIsCreating] = useState(false);
@@ -41,16 +46,18 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
 
   // Update form when upload data is provided
   useEffect(() => {
-    if (uploadedCid || uploadedGroupId) {
+    if (uploadedCid || uploadedGroupId || teeVerified !== undefined || teeScore !== undefined) {
       setFormData(prev => ({
         ...prev,
         cid: uploadedCid || prev.cid,
         novaGroupId: uploadedGroupId || prev.novaGroupId,
+        isTeeVerified: teeVerified ?? prev.isTeeVerified,
+        teeSignature: teeScore ?? prev.teeSignature,
       }));
     }
-  }, [uploadedCid, uploadedGroupId]);
+  }, [uploadedCid, uploadedGroupId, teeVerified, teeScore]);
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | boolean | number | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setError(null);
     setSuccess(false);
@@ -68,36 +75,37 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
       return;
     }
 
+    // Validate TEE signature if TEE verified is enabled
+    if (formData.isTeeVerified && (formData.teeSignature === null || formData.teeSignature < 0 || formData.teeSignature > 100)) {
+      toast.error('TEE signature must be between 0 and 100 when TEE verified is enabled');
+      return;
+    }
+
     setIsCreating(true);
     setError(null);
     setSuccess(false);
 
     try {
-      console.log('Creating listing with args:', {
+      const args = {
         product_id: parseInt(formData.productId),
         price: parseInt(formData.price),
         nova_group_id: formData.novaGroupId,
         list_type: formData.listType,
         cid: formData.cid,
         gp_owner: formData.gpOwner,
-        is_tee_verified: false,
-        tee_signature: null,
-      });
+        is_tee_verified: formData.isTeeVerified,
+        tee_signature: formData.isTeeVerified && formData.teeSignature !== null 
+          ? formData.teeSignature.toString() 
+          : null,
+      };
+
+      console.log('Creating listing with args:', args);
 
       // Call the create_listing function on the contract
       await callFunction({
         contractId: MARKETPLACE_CONTRACT,
         method: 'create_listing',
-        args: {
-          product_id: parseInt(formData.productId),
-          price: parseInt(formData.price),
-          nova_group_id: formData.novaGroupId,
-          list_type: formData.listType,
-          cid: formData.cid,
-          gp_owner: formData.gpOwner,
-          is_tee_verified: false,  // Required by updated contract
-          tee_signature: null,     // Required by updated contract
-        },
+        args,
       });
 
       setSuccess(true);
@@ -112,6 +120,8 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
           listType: 'Image',
           cid: uploadedCid || 'QmTestCID123456789abcdef',
           gpOwner: signedAccountId || '',
+          isTeeVerified: false,
+          teeSignature: null,
         });
         setSuccess(false);
       }, 3000);
@@ -254,6 +264,52 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
             </p>
           </div>
 
+          {/* TEE Verification Section */}
+          <div className="p-4 rounded-lg bg-secondary/50 border border-border space-y-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-green-400" />
+              <Label className="text-base font-semibold">TEE Verification (Optional)</Label>
+            </div>
+
+            {/* TEE Verified Checkbox */}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="isTeeVerified"
+                checked={formData.isTeeVerified}
+                onCheckedChange={(checked) => handleInputChange('isTeeVerified', checked as boolean)}
+                disabled={isCreating}
+              />
+              <Label 
+                htmlFor="isTeeVerified" 
+                className="text-sm font-normal cursor-pointer"
+              >
+                Enable TEE Verification
+              </Label>
+            </div>
+
+            {/* TEE Signature Score */}
+            {formData.isTeeVerified && (
+              <div className="space-y-2">
+                <Label htmlFor="teeSignature">
+                  AI Credibility Score (0-100) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="teeSignature"
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="Enter credibility score (e.g., 85)"
+                  value={formData.teeSignature ?? ''}
+                  onChange={(e) => handleInputChange('teeSignature', e.target.value ? parseFloat(e.target.value) : null)}
+                  disabled={isCreating}
+                />
+                <p className="text-xs text-muted-foreground">
+                  AI-generated credibility score (0-100). Higher scores indicate better quality/authenticity.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Error Message */}
           {error && (
             <motion.div
@@ -274,7 +330,10 @@ const CreateListing = ({ uploadedCid, uploadedGroupId }: CreateListingProps) => 
               className="flex items-start gap-3 p-4 rounded-lg bg-primary/10 border border-primary/20"
             >
               <CheckCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-primary">Test listing created successfully!</p>
+              <p className="text-sm text-primary">
+                Test listing created successfully!
+                {formData.isTeeVerified && ` (TEE Verified with score: ${formData.teeSignature})`}
+              </p>
             </motion.div>
           )}
 

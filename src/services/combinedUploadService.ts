@@ -76,7 +76,7 @@ export const uploadAndCreateListing = async (
       // Read file as ArrayBuffer and convert to Buffer (works in both environments)
     const arrayBuffer = await file.arrayBuffer();
     const fileBuffer = Buffer.from(arrayBuffer);
-    const aiScore=getFileCredibilityScoreFromBuffer(fileBuffer,description) || null;
+    const aiScore=await getFileCredibilityScoreFromBuffer(fileBuffer,description) || null;
     console.log('ai score is ', aiScore);
     // Step 1: Register group on NOVA (COMMENTED OUT - using existing group)
     onProgress?.({
