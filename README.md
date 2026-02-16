@@ -32,8 +32,8 @@ Each listing is verified using NEAR AI's private inference running in a Trusted 
 ### Installation
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/novamarket.git
-cd novamarket
+git clone https://github.com/juSt-jeLLy/NearSandbox.git
+cd NearSandbox
 
 # Install dependencies
 npm install
@@ -182,20 +182,8 @@ Powered by 1Click API:
 - [NOVA Protocol](https://nova-25.gitbook.io/nova-docs/)
 - [NEAR Protocol](https://docs.near.org)
 - [NEAR AI Cloud](https://docs.near.ai)
-- [1Click Protocol](https://docs.defuse.org)
+- [1Click Api](https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api)
 
-## 🤝 Contributing
-
-Contributions welcome!
-
-1. Fork repository
-2. Create feature branch
-3. Commit changes
-4. Push and open PR
-
-## 📄 License
-
-MIT License - see LICENSE file
 
 ## 🙏 Acknowledgments
 
@@ -208,4 +196,4 @@ Built with:
 
 ---
 
-**Built with ❤️ for the decentralized future**
+
