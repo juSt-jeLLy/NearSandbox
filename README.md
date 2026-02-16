@@ -6,8 +6,12 @@ A decentralized marketplace for encrypted digital assets built on NEAR Protocol,
 
 Semicolon enables users to securely buy and sell digital assets with end-to-end encryption. Files are encrypted clientside, stored on NOVA Protocol, and access is managed through NEAR smart contracts. Each listing is verified using NEAR AI's private inference in TEE for credibility scoring.
 
+Each listing is verified using NEAR AI's private inference running in a Trusted Execution Environment (TEE), providing an AI-powered credibility score that helps buyers assess product quality before purchase. The entire system is built on zero-knowledge principles: encryption keys are managed off-chain in hardware-secured TEEs via Shade Agents, sellers maintain granular control over who can decrypt their files, and even cloud providers cannot access the plaintext data. This creates a decentralized marketplace where privacy, security, and transparency coexist—you own your data, control who accesses it, and can verify every transaction on-chain while keeping your intellectual property completely private.
+
+
 ### Key Features
 
+- 🔑**Contract Address**: singlelibrary5839.near
 - 🔐 **End-to-End Encryption**: Files encrypted client-side using AES-256-GCM
 - 🌐 **Decentralized Storage**: IPFS storage via NOVA Protocol with Pinata
 - 🤖 **AI Credibility Scoring**: TEE-verified analysis (20-100 score)
